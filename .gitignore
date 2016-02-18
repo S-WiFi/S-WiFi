@@ -26,3 +26,11 @@
 *.exe
 *.out
 *.app
+
+# autoconf
+configure
+config.h
+config.status
+.deps/
+zlib-1.2.3/Makefile
+zlib-1.2.3/zconf.h
