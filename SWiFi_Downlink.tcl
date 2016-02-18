@@ -89,9 +89,8 @@ Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
 Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
 Mac/802_11 set TxFeedback_ 0;
 
-#Agent/SWiFi_Downlink set packetSize_ 160
-#Agent/SWiFi_Downlink set slotInterval_ 0.01
-Agent/SWiFi_Downlink set numSlot_ 1000
+#Agent/SWiFi set packet_size_ 160
+#Agent/SWiFi set slot_interval_ 0.01
 
 set dRNG [new RNG]
 $dRNG seed [lindex $argv 0]
@@ -122,7 +121,7 @@ set node_(0) [$ns_ node]
 $node_(0) set X_ 3
 $node_(0) set Y_ 100
 $node_(0) set Z_ 0
-set sw_(0) [new Agent/SWiFi_Downlink]
+set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
 
@@ -132,7 +131,7 @@ for {set i 1} {$i < $val(nn) } {incr i} {
 	$node_($i) set X_ [expr 3.0 + $i*1]
 	$node_($i) set Y_ 100
 	$node_($i) set Z_ 0
-	set vod_($i) [new Agent/SWiFi_Downlink]
+	set sw_($i) [new Agent/SWiFi]
 	$ns_ attach-agent $node_($i) $sw_($i)
 }
 
@@ -168,12 +167,12 @@ $ns_ at 10000.0 "stop"
 #
 #Mac/802_11 instproc txfailed {} {
 #	upvar sw_(0) mysw
-#	$myvod update_failed 
+#	$mysw update_failed 
 #}
 
 #Mac/802_11 instproc txsucceed {} {
 #	upvar sw_(0) mysw
-#	$myvod update_delivered 
+#	$mysw update_delivered 
 #}
 
 #Mac/802_11 instproc brdsucced {} {
