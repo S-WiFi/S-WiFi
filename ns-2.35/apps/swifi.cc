@@ -27,14 +27,14 @@ public:
 } class_swifi;
 
 
-SWiFiClient::SWiFiClient() : addr_(0), is_active_ = true
+SWiFiClient::SWiFiClient() : addr_(0), is_active_(true)
 {
 	qn_ = 0;	    //throughput requirement
 	tier_ = 1;	    //tier of this client
 	pn_ = 0;        //channel reliability
 }
 
-SWiFiAgent::SWiFiAgent() : Agent(PT_SWIFI), seq_(0), mac_(0)
+SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 { //TODO: Revise...
 	num_client_ = 0;
 	client_list_ = vector<SWiFiClient*>();

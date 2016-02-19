@@ -68,11 +68,11 @@ public:
 class SWiFiAgent : public Agent {
 
 public:
-	SwiFiAgent();
-	~SwiFiAgent();
+	SWiFiAgent();
+	~SWiFiAgent();
 
  	int seq_;	       // a send sequence number like in real ping
-	int num_clients_;  // number of total clients
+	int num_client_;  // number of total clients
 	vector<SWiFiClient*> client_list_;  // For a server to handle scheduling among clients
 	bool is_server_;   // Indicate whether the agent is a server or not
 

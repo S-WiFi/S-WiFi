@@ -151,11 +151,11 @@ set period     100.0
 set num_runs   1
 set num_trans  10000
 
-for {set k 0} {$k < num_runs} {incr k} {
+for {set k 0} {$k < $num_runs} {incr k} {
 	if [expr $k > 0] {
 		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart" 		
 	}
-	for {set i 0} {$i < num_trans} {incr i} {
+	for {set i 0} {$i < $num_trans} {incr i} {
 		$ns_ at [expr $period*($k + 1) + $i/100.0] "$sw_(0) send"
 	}
 }

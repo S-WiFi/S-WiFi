@@ -163,6 +163,7 @@ set protolist {
 	Message # a protocol to carry text messages
 	Ping 	# Ping
     PBC     # PBC
+	SWiFi 	# S-WiFi
 # Wireless:
 	ARP 	# Address Resolution Protocol, network wireless stack
 	GAF 	# Geographic Adaptive Delity, for ad-hoc networks
