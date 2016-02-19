@@ -96,6 +96,10 @@ set dRNG [new RNG]
 $dRNG seed [lindex $argv 0]
 $dRNG default
 
+# Create channel
+# cf. ns-2.35/tcl/ex/wireless-mitf.tcl
+set chan_1_ [new $val(chan)]
+
 $ns_ node-config -adhocRouting $val(rp) \
 				 -llType $val(ll) \
 			 	 -macType $val(mac) \
@@ -104,7 +108,7 @@ $ns_ node-config -adhocRouting $val(rp) \
 			 	 -antType $val(ant) \
 			 	 -propType $val(prop) \
 			 	 -phyType $val(netif) \
-			 	 -channelType $val(chan) \
+			 	 -channel $chan_1_ \
 			 	 -topoInstance $topo \
 			 	 -agentTrace ON\
 			 	 -routerTrace OFF \

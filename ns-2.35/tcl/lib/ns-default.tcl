@@ -1591,4 +1591,5 @@ Agent/PBC set modulationScheme 0
 Agent/MDART set macFailed_ true
 Agent/MDART set etxMetric_ true
 
-Agent/SWiFi set packetSize_ 1000
+Agent/SWiFi set packet_size_ 160
+Agent/SWiFi set slot_interval_ 0.01
