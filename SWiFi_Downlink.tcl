@@ -92,9 +92,19 @@ Mac/802_11 set TxFeedback_ 0;
 #Agent/SWiFi set packet_size_ 160
 #Agent/SWiFi set slot_interval_ 0.01
 
+Agent/SWiFi instproc recv {from rtt} {
+        $self instvar node_
+        puts "node [$node_ id] received poll reply from \
+              $from with round-trip-time $rtt ms."
+}
+
 set dRNG [new RNG]
 $dRNG seed [lindex $argv 0]
 $dRNG default
+
+# Create channel
+# cf. ns-2.35/tcl/ex/wireless-mitf.tcl
+set chan_1_ [new $val(chan)]
 
 $ns_ node-config -adhocRouting $val(rp) \
 				 -llType $val(ll) \
@@ -104,7 +114,7 @@ $ns_ node-config -adhocRouting $val(rp) \
 			 	 -antType $val(ant) \
 			 	 -propType $val(prop) \
 			 	 -phyType $val(netif) \
-			 	 -channelType $val(chan) \
+			 	 -channel $chan_1_ \
 			 	 -topoInstance $topo \
 			 	 -agentTrace ON\
 			 	 -routerTrace OFF \
@@ -151,18 +161,26 @@ set period     100.0
 set num_runs   1
 set num_trans  10000
 
-for {set k 0} {$k < num_runs} {incr k} {
+set uplink 1
+if {$uplink} {
+	set command "$sw_(0) poll"
+} else {
+	set command "$sw_(0) send"
+}
+
+for {set k 0} {$k < $num_runs} {incr k} {
 	if [expr $k > 0] {
 		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart" 		
 	}
-	for {set i 0} {$i < num_trans} {incr i} {
-		$ns_ at [expr $period*($k + 1) + $i/100.0] "$sw_(0) send"
+	for {set i 0} {$i < $num_trans} {incr i} {
+		$ns_ at [expr $period*($k + 1) + $i/100.0] "$command"
 	}
 }
 
 #$ns_ at 8000.0 "$sw_(0) report" 
 
 $ns_ at 10000.0 "stop"
+$ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 
 #
 #Mac/802_11 instproc txfailed {} {
@@ -184,4 +202,5 @@ proc stop {} {
     close $tracefd
 }
 
+puts "Starting simulation..."
 $ns_ run
