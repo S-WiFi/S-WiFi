@@ -32,6 +32,29 @@
 # simple-wireless.tcl
 # A simple example for wireless simulation
 
+if {$argc < 1} {
+	set func "rtt"
+} else {
+	set func [lindex $argv 0]
+	if {0 == [string compare $func "help"]} {
+		puts "$argv0 func mode"
+		puts "    func    One of rtt (default), reliability, and delay"
+		puts "    mode    One of downlink (default), uplink"
+		exit 0
+	}
+}
+if {$argc < 2} {
+	set mode "downlink"
+} else {
+	set mode [lindex $argv 1]
+}
+puts "func: $func, mode: $mode"
+if {0 != [string compare $func "rtt"]} {
+	puts "Error: func $func is not implemented!"
+	exit 1
+}
+
+
 # ======================================================================
 # Define options
 # ======================================================================
@@ -92,10 +115,14 @@ Mac/802_11 set TxFeedback_ 0;
 Agent/SWiFi set packet_size_ 1000
 #Agent/SWiFi set slot_interval_ 0.01
 
+set logfname [format "swifi_%s_%s.log" $func $mode]
+set logf [open $logfname w]
 Agent/SWiFi instproc recv {from rtt} {
+	global logf
         $self instvar node_
-        puts "node [$node_ id] received poll reply from \
-              $from with round-trip-time $rtt ms."
+        puts $logf "Node [$node_ id] received reply from node $from\
+		with round-trip-time $rtt ms."
+	flush $logf
 }
 
 set dRNG [new RNG]
@@ -161,8 +188,7 @@ set period     100.0
 set num_runs   1
 set num_trans  10000
 
-set uplink 1
-if {$uplink} {
+if {0 == [string compare $mode "uplink"]} {
 	set command "$sw_(0) poll"
 } else {
 	set command "$sw_(0) send"
@@ -197,9 +223,10 @@ $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 #}
 
 proc stop {} {
-    global ns_ tracefd
+    global ns_ tracefd logf
     $ns_ flush-trace
     close $tracefd
+    close $logf
 }
 
 puts "Starting simulation..."
