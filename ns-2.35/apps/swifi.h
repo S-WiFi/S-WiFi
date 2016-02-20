@@ -22,6 +22,10 @@ using std::vector;
 using std::endl;
 using std::ofstream;
 
+enum swifi_pkt_t {
+	SWiFi_PKT_POLL = 10,
+};
+
 
 struct hdr_swifi {
 	char ret_;
