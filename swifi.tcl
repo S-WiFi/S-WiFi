@@ -49,7 +49,7 @@ if {$argc < 2} {
 	set mode [lindex $argv 1]
 }
 puts "func: $func, mode: $mode"
-if {0 != [string compare $func "rtt"]} {
+if {0 == [string compare $func "delay"]} {
 	puts "Error: func $func is not implemented!"
 	exit 1
 }
@@ -112,8 +112,13 @@ Mac/802_11 set CWMax_         1
 Mac/802_11 set PreambleLength_  144                   ;# long preamble 
 Mac/802_11 set RTSThreshold_  5000
 Mac/802_11 set PLCPDataRate_  1.0e6                   ;# 1Mbps
-Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
-Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
+if {0 == [string compare $func "reliability"]} {
+    Mac/802_11 set ShortRetryLimit_       0               ;# retransmittions
+    Mac/802_11 set LongRetryLimit_        0               ;# retransmissions
+} else {
+    Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
+    Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
+}
 Mac/802_11 set TxFeedback_ 0;
 
 Agent/SWiFi set packet_size_ 1000
@@ -121,8 +126,10 @@ Agent/SWiFi set packet_size_ 1000
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
+set n_rx 0
 Agent/SWiFi instproc recv {from rtt data} {
-	global logf
+	global logf n_rx
+	set n_rx [expr $n_rx + 1]
         $self instvar node_
         puts $logf "Node [$node_ id] received reply from node $from\
 		with round-trip-time $rtt ms and message $data."
@@ -165,11 +172,17 @@ $node_(0) set Z_ 0
 set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
+# Only used by problem 3.
+set distance 1000
 
 for {set i 1} {$i < $val(nn) } {incr i} {
 	set node_($i) [$ns_ node]	
 	$node_($i) random-motion 0		;# disable random motion
-	$node_($i) set X_ [expr 3.0 + $i*1]
+	if {0 == [string compare $func "rtt"]} {
+		$node_($i) set X_ [expr 3.0 + $i*1]
+	} elseif {0 == [string compare $func "reliability"]} {
+		$node_($i) set X_ [expr 3.0 + $i*$distance]
+	}
 	$node_($i) set Y_ 100
 	$node_($i) set Z_ 0
 	set sw_($i) [new Agent/SWiFi]
@@ -227,10 +240,16 @@ $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 #}
 
 proc stop {} {
-    global ns_ tracefd logf
-    $ns_ flush-trace
-    close $tracefd
-    close $logf
+	global ns_ tracefd logf
+	$ns_ flush-trace
+	close $tracefd
+	close $logf
+	global func
+	if {0 == [string compare $func "reliability"]} {
+		global n_rx num_trans distance
+		set reliability [expr double($n_rx) / $num_trans]
+		puts "distance: $distance, reliability: $reliability"
+	}
 }
 
 puts "Starting simulation..."
