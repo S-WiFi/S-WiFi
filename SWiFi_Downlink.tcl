@@ -58,7 +58,7 @@ set val(rp)             DumbAgent                  ;# routing protocol
 # ======================================================================
 
 set ns_		[new Simulator]
-set tracefd     [open WiFi_downlink.tr w]
+set tracefd     [open SWiFi.tr w]
 $ns_ trace-all $tracefd
 
 # set up topography object
@@ -155,7 +155,7 @@ $ns_ at 0.5 "$sw_(0) server"
 #$mymac setTxFeedback 1
 
 $ns_ connect $sw_(1) $sw_(0)
-#$ns_ at 3.0 "$sw_(1) register 200 1 0 1"
+$ns_ at 3.0 "$sw_(1) register 1 1 0"
 
 set period     100.0
 set num_runs   1
@@ -198,7 +198,7 @@ $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 
 proc stop {} {
     global ns_ tracefd
-    #$ns_ flush-trace
+    $ns_ flush-trace
     close $tracefd
 }
 
