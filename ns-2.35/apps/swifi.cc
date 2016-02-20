@@ -48,6 +48,7 @@
 
 #include "swifi.h"
 #include <cstdlib>
+#include <cstring>
 
 int hdr_swifi::offset_;
 static class SWiFiHeaderClass : public PacketHeaderClass {
@@ -236,20 +237,21 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	}
 	// This is a data packet from client to server (UPLINK).
 	// Assume it is the reply of POLL packet from server to client.
-	else if (hdr->ret_ == 2){
-		if (is_server_ == true) {
+	else if (hdr->ret_ == 2) {
+		if (is_server_ && pkt->userdata()
+			       && pkt->userdata()->type() == PACKET_DATA) {
+			PacketData* data = (PacketData*)pkt->userdata();
 			// Use tcl.eval to call the Tcl
 			// interpreter with the poll results.
 			// Note: In the Tcl code, a procedure
-			// 'Agent/SWiFi recv {from rtt}' has to be defined which
-			// allows the user to react to the poll result.
-			char out[100];
+			// 'Agent/SWiFi recv {from rtt data}' has to be defined
+			// which allows the user to react to the poll result.
 			// Calculate the round trip time
-			sprintf(out, "%s recv %d %3.1f", name(),
-					hdrip->src_.addr_ >> Address::instance().NodeShift_[1],
-					(Scheduler::instance().clock()-hdr->send_time_) * 1000);
 			Tcl& tcl = Tcl::instance();
-			tcl.eval(out);
+			tcl.evalf("%s recv %d %3.1f \"%s\"", name(),
+					hdrip->src_.addr_ >> Address::instance().NodeShift_[1],
+					(Scheduler::instance().clock()-hdr->send_time_) * 1000,
+					data->data());
 		}
 		Packet::free(pkt);
 		return;
@@ -296,16 +298,20 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			Packet::free(pkt);
 			// Create a new packet
 			Packet* pktret = allocpkt();
-			// Access the Ping header for the new packet:
+			// Access the packet header for the new packet:
 			hdr_swifi* hdrret = hdr_swifi::access(pktret);
-			// Set the 'ret' field to 2, so the receiver won't send
-			// another echo
+			// Set ret to 2 (data packet from client to server)
 			hdrret->ret_ = 2;
 			// Set the send_time field to the correct value
 			hdrret->send_time_ = stime;
 			// Added by Andrei Gurtov for one-way delay measurement.
 			hdrret->rcv_time_ = Scheduler::instance().clock();
 			hdrret->seq_ = rcv_seq;
+			// Fill in the data payload
+			char *msg = "I'm feeling great!";
+			PacketData *data = new PacketData(1 + strlen(msg));
+			strcpy((char*)data->data(), msg);
+			pktret->setdata(data);
 			// Send the packet
 			send(pktret, 0);
 		}

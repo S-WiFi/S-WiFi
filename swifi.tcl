@@ -117,11 +117,11 @@ Agent/SWiFi set packet_size_ 1000
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
-Agent/SWiFi instproc recv {from rtt} {
+Agent/SWiFi instproc recv {from rtt data} {
 	global logf
         $self instvar node_
         puts $logf "Node [$node_ id] received reply from node $from\
-		with round-trip-time $rtt ms."
+		with round-trip-time $rtt ms and message $data."
 	flush $logf
 }
 
