@@ -81,6 +81,7 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	client_list_ = vector<SWiFiClient*>();
 	is_server_ = 0;
 	target_ = 0;
+	packet_size_ = 0;
 	bind("packet_size_", &packet_size_);
 	bind("slot_interval_", &slot_interval_);
 }
@@ -147,6 +148,9 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->send_time_ = Scheduler::instance().clock();
 			// IP information  			
 			hdr_ip *ip = hdr_ip::access(pkt);
+			// Set packet size
+			size_ = packet_size_;
+			hdr->pkt_size_ = packet_size_;
 			// Broadcasting only. Need to specify ip and ACK address later on.			
 			send(pkt, 0);
 
@@ -167,6 +171,9 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
+			// Set packet size
+			size_ = packet_size_;
+			hdr->pkt_size_ = packet_size_;
 			// Broadcasting only. Need to specify ip address later on.			
 			send(pkt, 0);
 			// return TCL_OK, so the calling function knows that
