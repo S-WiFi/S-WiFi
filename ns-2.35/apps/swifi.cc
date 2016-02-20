@@ -146,7 +146,10 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
 			// IP information  			
-			hdr_ip *ip = hdr_ip::access(pkt);	
+			hdr_ip *ip = hdr_ip::access(pkt);
+			// Broadcasting only. Need to specify ip and ACK address later on.			
+			send(pkt, 0);
+
 			// return TCL_OK, so the calling function knows that
 			// the command has been processed
 			return (TCL_OK);   
@@ -164,6 +167,8 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
+			// Broadcasting only. Need to specify ip address later on.			
+			send(pkt, 0);
 			// return TCL_OK, so the calling function knows that
 			// the command has been processed
 			return (TCL_OK);
