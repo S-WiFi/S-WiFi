@@ -89,7 +89,7 @@ Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
 Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
 Mac/802_11 set TxFeedback_ 0;
 
-#Agent/SWiFi set packet_size_ 160
+Agent/SWiFi set packet_size_ 1000
 #Agent/SWiFi set slot_interval_ 0.01
 
 Agent/SWiFi instproc recv {from rtt} {
