@@ -100,7 +100,11 @@ create-god $val(nn)
 # ======================================================================
 
 Phy/WirelessPhy set Pt_ 1
-Propagation/Shadowing set pathlossExp_ 0.0			 
+Propagation/Shadowing set pathlossExp_ 2.0  ;# path loss exponent
+Propagation/Shadowing set std_db_ 4.0       ;# shadowing deviation (dB)
+Propagation/Shadowing set dist0_ 1.0        ;# reference distance (m)
+Propagation/Shadowing set seed_ 0           ;# seed for RNG
+
 Mac/802_11 set dataRate_  11.0e6
 Mac/802_11 set basicRate_ 11.0e6
 Mac/802_11 set CWMin_         1
