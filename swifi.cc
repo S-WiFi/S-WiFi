@@ -240,7 +240,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	}
 	// This is a data packet from client to server (UPLINK).
 	// Assume it is the reply of POLL packet from server to client.
-	else if (hdr->ret_ == 2 || hdr->ret_ == 7) {
+	else if (hdr->ret_ == 2) {
 		if (is_server_ && pkt->userdata()
 			       && pkt->userdata()->type() == PACKET_DATA) {
 			PacketData* data = (PacketData*)pkt->userdata();
