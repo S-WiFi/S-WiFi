@@ -92,11 +92,17 @@ SWiFiAgent::~SWiFiAgent()
 	for (unsigned int i = 0; i < client_list_.size(); i++) {
 		delete client_list_[i];
 	}
+	client_list_.clear();
 }
 
 void SWiFiAgent::Reset()
-{ //TODO: Reset all parameters and history
-
+{
+	// Reset client list.
+	for (unsigned int i = 0; i < client_list_.size(); i++) {
+		delete client_list_[i];
+	}
+	client_list_.clear();
+	num_client_ = 0;
 }
 // ************************************************
 // Table of commands:
