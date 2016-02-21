@@ -292,7 +292,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	}
 
 	// An user-defined ACK packet from client to server
-	else if(hdr->ret_ ==777){
+	else if(hdr->ret_ ==7){
 		if (is_server_ && pkt->userdata()
 			       && pkt->userdata()->type() == PACKET_DATA) {
 			PacketData* data = (PacketData*)pkt->userdata();
