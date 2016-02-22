@@ -355,7 +355,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			hdrret->seq_ = rcv_seq;
 			// Set packet size
 			size_ = packet_size_;
-			hdr->pkt_size_ = packet_size_;
+			hdrret->pkt_size_ = packet_size_;
 			// Fill in the data payload
 			char *msg = "I'm feeling great!";
 			PacketData *data = new PacketData(1 + strlen(msg));
