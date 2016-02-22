@@ -138,7 +138,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		}
 		else if (strcmp(argv[1], "send") == 0) {
 			// Create a new packet
-			Packet* pkt = allocpkt();
+				Packet* pkt = allocpkt();
 			// Access the header for the new packet:
 			hdr_swifi* hdr = hdr_swifi::access(pkt);
 			// Let the 'ret_' field be 0, so the receiving node
@@ -153,7 +153,10 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			size_ = packet_size_;
 			hdr->pkt_size_ = packet_size_;
 			// Broadcasting only. Need to specify ip and ACK address later on.			
-			send(pkt, 0);
+			send(pkt, 0);  
+			
+			
+			
 
 			// return TCL_OK, so the calling function knows that
 			// the command has been processed
@@ -258,20 +261,57 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	}
     // A data packet from server to client was received. 
 	else if (hdr->ret_ == 3){	
+		if(!is_server_==true){
 		// Send an user-defined ACK to server
-/*		Packet* pkt_ACK = allocpkt();
-		hdr_swifi* hdr_ACK = hdr_swifi::access(pkt_ACK);
-		hdr_ip* hdrip_ACK = hdr_ip::access(pkt_ACK);
-		hdrip_ACK->daddr() = (u_int32_t)hdrip->saddr();
-		hdr_ACK->ret_ = 7;
-		send(pkt_ACK, 0); 
-*/
+		//first save the old packet's send_time
+		double stime = hdr->send_time_;
+		int rcv_seq = hdr->seq_;
 		// Discard the packet
 		Packet::free(pkt);
+		//create a new packet
+	    Packet* pkt_ACK = allocpkt();
+	    //Access packet header for the new packet
+		hdr_swifi* hdr_ACK = hdr_swifi::access(pkt_ACK);
+		//Set the ret to 7, so the receiver won't send another echo
+		hdr_ACK->ret_= 7;
+		//set the send_time field to the correct value
+		hdr_ACK->send_time_ = stime;
+		hdr_ACK->seq_ = rcv_seq;
+		//Fill in the data payload
+		char *msg = "I have received the packet!";
+		PacketData *data = new PacketData(1+strlen(msg));
+		strcpy((char*)data->data(),msg);
+		pkt_ACK->setdata(data);
+		//send the packet
+		send(pkt_ACK,0);
+		}
+		
 		return;
+		
+		
 	}
 
 	// An user-defined ACK packet from client to server
+	else if(hdr->ret_ ==7){
+		if (is_server_ && pkt->userdata()
+			       && pkt->userdata()->type() == PACKET_DATA) {
+			PacketData* data = (PacketData*)pkt->userdata();
+			// Use tcl.eval to call the Tcl
+			// interpreter with the poll results.
+			// Note: In the Tcl code, a procedure
+			// 'Agent/SWiFi recv {from rtt data}' has to be defined
+			// which allows the user to react to the poll result.
+			// Calculate the round trip time
+			Tcl& tcl = Tcl::instance();
+			tcl.evalf("%s recv %d %3.1f \"%s\"", name(),
+					hdrip->src_.addr_ >> Address::instance().NodeShift_[1],
+					(Scheduler::instance().clock()-hdr->send_time_) * 1000,
+					data->data());
+		}
+		Packet::free(pkt);
+		return;
+			
+	}
 /*
 	else if (hdr->ret_ == 7) {
 		if(is_server_ == true) {
@@ -317,4 +357,3 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 		}
 	}
 }
-
