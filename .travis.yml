@@ -1,0 +1,4 @@
+language: cpp
+script: ./install
+before_install:
+    - sudo apt-get install build-essential autoconf automake libxmu-dev
