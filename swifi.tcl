@@ -32,28 +32,55 @@
 # simple-wireless.tcl
 # A simple example for wireless simulation
 
+# ======================================================================
+# Handle command line arguments
+# ======================================================================
 if {$argc < 1} {
 	set func "rtt"
 } else {
 	set func [lindex $argv 0]
-	if {0 == [string compare $func "help"]} {
-		puts "$argv0 func mode"
-		puts "    func    One of rtt (default), reliability, and delay"
-		puts "    mode    One of downlink (default), uplink"
-		exit 0
-	}
 }
 if {$argc < 2} {
 	set mode "downlink"
 } else {
 	set mode [lindex $argv 1]
 }
-puts "func: $func, mode: $mode"
-if {0 == [string compare $func "delay"]} {
-	puts "Error: func $func is not implemented!"
-	exit 1
+# Allow abbreviated command line arguments.
+# e.g. `ns swifi.tcl d` is the same as `ns swifi.tcl delay`
+proc usage {} {
+	global argv0
+	puts "$argv0 func mode"
+	puts "    func    One of rtt (default), reliability, and delay"
+	puts "    mode    One of downlink (default), uplink"
+	exit 0
 }
-
+switch -glob -nocase $func {
+	d* {
+		set func "delay"
+		puts "Error: not implemented yet."
+	}
+	re* {
+		set func "reliability"
+	}
+	rt* {
+		set func "rtt"
+	}
+	default {
+		usage
+	}
+}
+switch -glob -nocase $mode {
+	d* {
+		set mode "downlink"
+	}
+	u* {
+		set mode "uplink"
+	}
+	default {
+		usage
+	}
+}
+puts "func: $func, mode: $mode"
 
 # ======================================================================
 # Define options
