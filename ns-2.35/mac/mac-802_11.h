@@ -323,6 +323,7 @@ private:
 	double		MaxChannelTime;
 	double		MinChannelTime;
 	double		ChannelTime;
+	u_int32_t	TxFeedback_; // enable/disable tx feedback feature
 	
 public:
 	u_int32_t	FailedCount;	
@@ -337,6 +338,7 @@ public:
        inline double getMaxChannelTime() { return(MaxChannelTime);}
        inline double getMinChannelTime() { return(MinChannelTime);}
        inline double getChannelTime() { return(ChannelTime);}
+       inline u_int32_t getTxFeedback(){ return(TxFeedback_);}
 };
 
 
@@ -597,7 +599,6 @@ private:
 
 	NsObject*	logtarget_;
 	NsObject*       EOTtarget_;     // given a copy of packet at TX end
-
 
 	/* ============================================================
 	   Duplicate Detection state

@@ -186,6 +186,8 @@ MAC_MIB::MAC_MIB(Mac802_11 *parent)
 	parent->bind("MaxChannelTime_", &MaxChannelTime);
 	parent->bind("MinChannelTime_", &MinChannelTime);
 	parent->bind("ChannelTime_", &ChannelTime);
+	// Enable/disable tx feedback in tcl
+	parent->bind("TxFeedback_", &TxFeedback_);
 }
 	
 
@@ -2067,8 +2069,13 @@ Mac802_11::recvACK(Packet *p)
 	}
 	if(tx_state_ != MAC_SEND) {
 		discard(p, DROP_MAC_INVALID_STATE);
+		if (macmib_.getTxFeedback() == 1){
+			Tcl& tcl = Tcl::instance();
+			tcl.evalf("%s txfailed", name());
+		}
 		return;
 	}
+
 	assert(pktTx_);
 
 	mhSend_.stop();
@@ -2086,6 +2093,18 @@ Mac802_11::recvACK(Packet *p)
 	else
 		slrc_ = 0;
 	rst_cw();
+
+	// Use tcl.eval to call the Tcl
+	// interpreter with the poll results.
+	// Note: In the Tcl code, a procedure
+	// 'Mac/802_11 txsucceed' has to be defined
+	// which allows the mac to give feedback to
+	// the application.
+	if (macmib_.getTxFeedback() == 1){
+		Tcl& tcl = Tcl::instance();
+		tcl.evalf("%s txsucceed", name());
+	}
+
 	Packet::free(pktTx_); 
 	pktTx_ = 0;
 	

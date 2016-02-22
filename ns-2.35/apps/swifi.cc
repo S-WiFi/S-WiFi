@@ -124,6 +124,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			return (TCL_OK);
 		}
 		else if (strcmp (argv[1], "update_delivered") == 0){ //TODO: receive an ACK
+			printf("succeed!\n");
 			return (TCL_OK);
 		}
 		else if (strcmp(argv[1], "update_failed") == 0){ //TODO: 

@@ -148,7 +148,7 @@ if {0 == [string compare $func "reliability"]} {
     Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
     Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
 }
-Mac/802_11 set TxFeedback_ 0;
+Mac/802_11 set TxFeedback_ 1;
 
 Agent/SWiFi set packet_size_ 1000
 #Agent/SWiFi set slot_interval_ 0.01
@@ -157,6 +157,8 @@ set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
 set datfname [format "swifi_%s_%s.dat" $func $mode]
 set datf [open $datfname w]
+set msgfname [format "swifi_%s_%s.msg" $func $mode]
+set msgf [open $msgfname w]
 set n_rx 0
 Agent/SWiFi instproc recv {from rtt data} {
 	global logf n_rx func
@@ -287,16 +289,20 @@ for {set k 0} {$k < $num_runs} {incr k} {
 $ns_ at 10000.0 "stop"
 $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 
-#
-#Mac/802_11 instproc txfailed {} {
-#	upvar sw_(0) mysw
-#	$mysw update_failed 
-#}
 
-#Mac/802_11 instproc txsucceed {} {
-#	upvar sw_(0) mysw
-#	$mysw update_delivered 
-#}
+Mac/802_11 instproc txfailed {} {
+	upvar sw_(0) mysw 
+	$mysw update_failed 
+	upvar msgf mymsg
+	puts $mymsg "tx failed!"
+}
+
+Mac/802_11 instproc txsucceed {} {
+	upvar sw_(0) mysw
+	$mysw update_delivered
+	upvar msgf mymsg
+	puts $mymsg "tx succeeded!" 
+}
 
 #Mac/802_11 instproc brdsucced {} {
 #}
