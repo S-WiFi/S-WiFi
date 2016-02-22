@@ -49,7 +49,7 @@ if {$argc < 2} {
 	set mode [lindex $argv 1]
 }
 puts "func: $func, mode: $mode"
-if {0 != [string compare $func "rtt"]} {
+if {0 == [string compare $func "delay"]} {
 	puts "Error: func $func is not implemented!"
 	exit 1
 }
@@ -100,7 +100,11 @@ create-god $val(nn)
 # ======================================================================
 
 Phy/WirelessPhy set Pt_ 1
-Propagation/Shadowing set pathlossExp_ 0.0			 
+Propagation/Shadowing set pathlossExp_ 2.0  ;# path loss exponent
+Propagation/Shadowing set std_db_ 4.0       ;# shadowing deviation (dB)
+Propagation/Shadowing set dist0_ 1.0        ;# reference distance (m)
+Propagation/Shadowing set seed_ 0           ;# seed for RNG
+
 Mac/802_11 set dataRate_  11.0e6
 Mac/802_11 set basicRate_ 11.0e6
 Mac/802_11 set CWMin_         1
@@ -108,8 +112,13 @@ Mac/802_11 set CWMax_         1
 Mac/802_11 set PreambleLength_  144                   ;# long preamble 
 Mac/802_11 set RTSThreshold_  5000
 Mac/802_11 set PLCPDataRate_  1.0e6                   ;# 1Mbps
-Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
-Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
+if {0 == [string compare $func "reliability"]} {
+    Mac/802_11 set ShortRetryLimit_       0               ;# retransmittions
+    Mac/802_11 set LongRetryLimit_        0               ;# retransmissions
+} else {
+    Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
+    Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
+}
 Mac/802_11 set TxFeedback_ 0;
 
 Agent/SWiFi set packet_size_ 1000
@@ -117,12 +126,23 @@ Agent/SWiFi set packet_size_ 1000
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
+set datfname [format "swifi_%s_%s.dat" $func $mode]
+set datf [open $datfname w]
+set n_rx 0
 Agent/SWiFi instproc recv {from rtt data} {
-	global logf
+	global logf n_rx
+	set n_rx [expr $n_rx + 1]
         $self instvar node_
         puts $logf "Node [$node_ id] received reply from node $from\
 		with round-trip-time $rtt ms and message $data."
 	flush $logf
+}
+Agent/SWiFi instproc stat {n_run} {
+	global n_rx num_trans distance reliability datf
+	set reliability($n_run) [expr double($n_rx) / $num_trans]
+	puts $datf "$distance($n_run) $reliability($n_run)"
+	flush $datf
+	set n_rx 0
 }
 
 set dRNG [new RNG]
@@ -161,11 +181,12 @@ $node_(0) set Z_ 0
 set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
+set distance(0) 1
 
 for {set i 1} {$i < $val(nn) } {incr i} {
 	set node_($i) [$ns_ node]	
 	$node_($i) random-motion 0		;# disable random motion
-	$node_($i) set X_ [expr 3.0 + $i*1]
+	$node_($i) set X_ [expr 3.0 + $i*$distance(0)]
 	$node_($i) set Y_ 100
 	$node_($i) set Z_ 0
 	set sw_($i) [new Agent/SWiFi]
@@ -185,7 +206,12 @@ $ns_ connect $sw_(1) $sw_(0)
 $ns_ at 3.0 "$sw_(1) register 1 1 0"
 
 set period     100.0
-set num_runs   1
+if {0 == [string compare $func "rtt"]} {
+	set num_runs   1
+} elseif {0 == [string compare $func "reliability"]} {
+	set num_runs   10
+	set delta_dist 250
+}
 set num_trans  10000
 
 if {0 == [string compare $mode "uplink"]} {
@@ -196,11 +222,18 @@ if {0 == [string compare $mode "uplink"]} {
 
 for {set k 0} {$k < $num_runs} {incr k} {
 	if [expr $k > 0] {
-		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart" 		
+		for {set i 1} {$i < $val(nn)} {incr i} {
+			set distance($k) [expr $delta_dist * $k]
+			$ns_ at [expr $period*($k + 1) - 0.002] \
+				"$node_($i) set X_ [expr 3.0 + $i * $distance($k)]"
+		}
+
+		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart"
 	}
 	for {set i 0} {$i < $num_trans} {incr i} {
 		$ns_ at [expr $period*($k + 1) + $i/100.0] "$command"
 	}
+	$ns_ at [expr $period*($k + 2) - 0.003] "$sw_(0) stat $k"
 }
 
 #$ns_ at 8000.0 "$sw_(0) report" 
@@ -223,10 +256,10 @@ $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 #}
 
 proc stop {} {
-    global ns_ tracefd logf
-    $ns_ flush-trace
-    close $tracefd
-    close $logf
+	global ns_ tracefd logf
+	$ns_ flush-trace
+	close $tracefd
+	close $logf
 }
 
 puts "Starting simulation..."
