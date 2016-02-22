@@ -57,7 +57,6 @@ proc usage {} {
 switch -glob -nocase $func {
 	d* {
 		set func "delay"
-		puts "Error: not implemented yet."
 	}
 	re* {
 		set func "reliability"
@@ -142,6 +141,9 @@ Mac/802_11 set PLCPDataRate_  1.0e6                   ;# 1Mbps
 if {0 == [string compare $func "reliability"]} {
     Mac/802_11 set ShortRetryLimit_       0               ;# retransmittions
     Mac/802_11 set LongRetryLimit_        0               ;# retransmissions
+} elseif {0 == [string compare $func "delay"]} {
+    Mac/802_11 set ShortRetryLimit_       2               ;# retransmittions
+    Mac/802_11 set LongRetryLimit_        2               ;# retransmissions
 } else {
     Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
     Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
@@ -157,11 +159,16 @@ set datfname [format "swifi_%s_%s.dat" $func $mode]
 set datf [open $datfname w]
 set n_rx 0
 Agent/SWiFi instproc recv {from rtt data} {
-	global logf n_rx
+	global logf n_rx func
 	set n_rx [expr $n_rx + 1]
         $self instvar node_
+	if {0 != [string compare $func "delay"]} {
+		set rtt_name "round-trip-time"
+	} else {
+		set rtt_name "delay"
+	}
         puts $logf "Node [$node_ id] received reply from node $from\
-		with round-trip-time $rtt ms and message $data."
+		with $rtt_name $rtt ms and message $data."
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
@@ -208,7 +215,12 @@ $node_(0) set Z_ 0
 set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
-set distance(0) 1
+if {0 != [string compare $func "delay"]} {
+	set distance(0) 1
+} else {
+	# Set the distance that the reliability is >= 55% per Problem 3.
+	set distance(0) 1000
+}
 
 for {set i 1} {$i < $val(nn) } {incr i} {
 	set node_($i) [$ns_ node]	
@@ -233,13 +245,20 @@ $ns_ connect $sw_(1) $sw_(0)
 $ns_ at 3.0 "$sw_(1) register 1 1 0"
 
 set period     100.0
-if {0 == [string compare $func "rtt"]} {
-	set num_runs   1
-} elseif {0 == [string compare $func "reliability"]} {
+if {0 == [string compare $func "reliability"]} {
 	set num_runs   10
 	set delta_dist 250
+} else {
+	set num_runs   1
 }
 set num_trans  10000
+if {0 != [string compare $func "delay"]} {
+	set interval 0.01
+} else {
+	# RTT is acquired from measurements in Problem 1&2.
+	set rtt 0.0015
+	set interval [expr 2 * $rtt]
+}
 
 if {0 == [string compare $mode "uplink"]} {
 	set command "$sw_(0) poll"
@@ -258,7 +277,7 @@ for {set k 0} {$k < $num_runs} {incr k} {
 		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart"
 	}
 	for {set i 0} {$i < $num_trans} {incr i} {
-		$ns_ at [expr $period*($k + 1) + $i/100.0] "$command"
+		$ns_ at [expr $period * ($k + 1) + $i * $interval] "$command"
 	}
 	$ns_ at [expr $period*($k + 2) - 0.003] "$sw_(0) stat $k"
 }
