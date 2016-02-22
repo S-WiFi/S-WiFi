@@ -201,8 +201,8 @@ static const packet_t PT_MDART = 72;
 	
         // insert new packet types here
 	// S-WiFi packet
-static const packet_t PT_SWiFi = 100;
-static packet_t       PT_NTYPE = 73; // This MUST be the LAST one
+static const packet_t PT_SWiFi = 73;
+static packet_t       PT_NTYPE = 74; // This MUST be the LAST one
 
 enum packetClass
 {
