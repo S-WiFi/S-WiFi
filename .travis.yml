@@ -1,4 +1,4 @@
 language: cpp
-script: ./install
+script: ./install && ns swifi.tcl
 before_install:
     - sudo apt-get install build-essential autoconf automake libxmu-dev
