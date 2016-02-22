@@ -181,9 +181,9 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
-			// Set packet size
-			size_ = packet_size_;
-			hdr->pkt_size_ = packet_size_;
+			// Set packet size = 0
+			size_ = 0;
+			hdr->pkt_size_ = 0;
 			// Broadcasting only. Need to specify ip address later on.			
 			send(pkt, 0);
 			// return TCL_OK, so the calling function knows that
@@ -353,6 +353,9 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			// Added by Andrei Gurtov for one-way delay measurement.
 			hdrret->rcv_time_ = Scheduler::instance().clock();
 			hdrret->seq_ = rcv_seq;
+			// Set packet size
+			size_ = packet_size_;
+			hdrret->pkt_size_ = packet_size_;
 			// Fill in the data payload
 			char *msg = "I'm feeling great!";
 			PacketData *data = new PacketData(1 + strlen(msg));
