@@ -34,3 +34,33 @@ config.status
 .deps/
 zlib-1.2.3/Makefile
 zlib-1.2.3/zconf.h
+
+# TeX middle files
+*.aux
+*.bbl
+*.blg
+*.dvi
+*.glo
+*.gls
+*.idx
+*.ilg
+*.ind
+*.ist
+*.log
+*.out
+*.ps
+*.thm
+*.toc
+*.lof
+*.lot
+*.loe
+# Beamer generated:
+*.nav
+*.snm
+*.vrb
+# latexmk generated:
+*.fls
+*.fdb_latexmk
+# Biber & biblatex generated:
+*.bcf
+*.run.xml
