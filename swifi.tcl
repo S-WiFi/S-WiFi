@@ -107,7 +107,8 @@ set val(rp)             DumbAgent                  ;# routing protocol
 # ======================================================================
 
 set ns_		[new Simulator]
-set tracefd     [open SWiFi.tr w]
+set tracefname  [format "swifi_%s_%s.tr" $func $mode]
+set tracefd     [open $tracefname w]
 $ns_ trace-all $tracefd
 
 # set up topography object
