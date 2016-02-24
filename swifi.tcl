@@ -150,7 +150,7 @@ if {0 == [string compare $func "reliability"]} {
 }
 Mac/802_11 set TxFeedback_ 1;
 
-Agent/SWiFi set packet_size_ 1000
+Agent/SWiFi set packet_size_ 100
 #Agent/SWiFi set slot_interval_ 0.01
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
@@ -218,7 +218,7 @@ set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
 if {0 != [string compare $func "delay"]} {
-	set distance(0) 1
+	set distance(0) 650
 } else {
 	# Set the distance that the reliability is >= 55% per Problem 3.
 	set distance(0) 1000
@@ -245,11 +245,11 @@ $ns_ at 0.5 "$sw_(0) server"
 
 $ns_ connect $sw_(1) $sw_(0)
 $ns_ at 3.0 "$sw_(1) register 1 1 0"
-
+$ns_ at 10.0 "set n_rx 0"
 set period     100.0
 if {0 == [string compare $func "reliability"]} {
-	set num_runs   10
-	set delta_dist 250
+	set num_runs   1
+	set delta_dist 100
 } else {
 	set num_runs   1
 }
@@ -258,7 +258,11 @@ if {0 != [string compare $func "delay"]} {
 	set interval 0.01
 } else {
 	# RTT is acquired from measurements in Problem 1&2.
-	set rtt 0.0015
+	if {0 == [string compare $mode "uplink"]} {
+		set rtt 0.0015
+	} else {
+		set rtt 0.001235
+	}
 	set interval [expr 2 * $rtt]
 }
 
@@ -290,18 +294,18 @@ $ns_ at 10000.0 "stop"
 $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 
 
-Mac/802_11 instproc txfailed {} {
-	upvar sw_(0) mysw 
-	$mysw update_failed 
-	upvar msgf mymsg
-	puts $mymsg "tx failed!"
-}
+#Mac/802_11 instproc txfailed {} {
+#	upvar sw_(0) mysw 
+#	$mysw update_failed 
+#	upvar msgf mymsgf
+#	puts $mymsgf "tx failed!"
+#}
 
-Mac/802_11 instproc txsucceed {} {
+Mac/802_11 instproc txsucceed {recvtime ackfrom} {
 	upvar sw_(0) mysw
-	$mysw update_delivered
-	upvar msgf mymsg
-	puts $mymsg "tx succeeded!" 
+	$mysw update_delivered $recvtime $ackfrom
+	upvar msgf mymsgs
+	puts $mymsgs "tx succeeded at $recvtime !" 
 }
 
 #Mac/802_11 instproc brdsucced {} {

@@ -123,10 +123,6 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			is_server_ = true;
 			return (TCL_OK);
 		}
-		else if (strcmp (argv[1], "update_delivered") == 0){ //TODO: receive an ACK
-			printf("succeed!\n");
-			return (TCL_OK);
-		}
 		else if (strcmp(argv[1], "update_failed") == 0){ //TODO: 
 			printf("failed!\n");
 			return (TCL_OK);
@@ -145,7 +141,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		}
 		else if (strcmp(argv[1], "send") == 0) {
 			// Create a new packet
-				Packet* pkt = allocpkt();
+			Packet* pkt = allocpkt();
 			// Access the header for the new packet:
 			hdr_swifi* hdr = hdr_swifi::access(pkt);
 			// Let the 'ret_' field be 0, so the receiving node
@@ -153,7 +149,8 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->ret_ = 3; // It's a data packet
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
-			hdr->send_time_ = Scheduler::instance().clock();
+			agent_send_time_ = Scheduler::instance().clock();
+			hdr->send_time_ = agent_send_time_;
 			// IP information  			
 			hdr_ip *ip = hdr_ip::access(pkt);
 			// Set packet size
@@ -193,14 +190,33 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		}
 	}
 	else if (argc == 3) {
-        if (strcmp(argv[1], "mac") == 0){ 
+        	if (strcmp(argv[1], "mac") == 0){ 
 			mac_ = (Mac*)TclObject::lookup(argv[2]);
 			if(mac_ == 0) {
 			//TODO: printing...
 				printf("mac error!\n");
 			}
 			return (TCL_OK);
-		}	
+		}
+	
+	}
+	else if (argc == 4) {
+		if (strcmp (argv[1], "update_delivered") == 0){ //TODO: receive an ACK
+			if (is_server_){
+				// Use tcl.eval to call the Tcl
+				// interpreter with the poll results.
+				// Note: In the Tcl code, a procedure
+				// 'Agent/SWiFi recv {from rtt data}' has to be defined
+				// which allows the user to react to the poll result.
+				// Calculate the round trip time
+				Tcl& tcl = Tcl::instance();
+				tcl.evalf("%s recv %d %3.1f \"%s\"", name(),
+					(atoi(argv[3])), (atof(argv[2]) - agent_send_time_) * 1000,
+					(" "));
+				printf("succeed! delay is %f ms\n", (atof(argv[2]) - agent_send_time_)*1000);
+			}
+			return (TCL_OK);
+		}
 	}
 	else if (argc == 5) {
 		if (strcmp(argv[1], "register") == 0) {
@@ -276,8 +292,8 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 		// Discard the packet
 		Packet::free(pkt);
 		//create a new packet
-	    Packet* pkt_ACK = allocpkt();
-	    //Access packet header for the new packet
+	    	Packet* pkt_ACK = allocpkt();
+	    	//Access packet header for the new packet
 		hdr_swifi* hdr_ACK = hdr_swifi::access(pkt_ACK);
 		//Set the ret to 7, so the receiver won't send another echo
 		hdr_ACK->ret_= 7;
@@ -290,7 +306,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 		strcpy((char*)data->data(),msg);
 		pkt_ACK->setdata(data);
 		//send the packet
-		send(pkt_ACK,0);
+		//send(pkt_ACK,0);
 		}
 		
 		return;

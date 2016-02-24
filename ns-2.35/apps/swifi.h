@@ -63,8 +63,8 @@ public:
 	bool is_active() {return is_active_;}
 
 	u_int32_t addr_; // address
-	double qn_;	     // throughput requirement
-	int tier_;	     // tier of this client
+	double qn_;	 // throughput requirement
+	int tier_;	 // tier of this client
 	double pn_;      // channel reliability
 	bool is_active_; // indicate whether the client is active or not
 };
@@ -94,6 +94,7 @@ protected:
 	SWiFiClient* target_;  // Only for server: showing the current target client 
 	ofstream tracefile_;   // For outputting user-defined trace file
 	unsigned int n_run_;   // count of simulation runs
+	double agent_send_time_;// the send time of the current "send" packet 
 
 };
 
