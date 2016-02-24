@@ -14,6 +14,12 @@
 %\usepackage[scaled]{helvet}
 \usepackage{mathptmx}
 \usepackage{verbatim}
+\usepackage{listings}
+\usepackage{siunitx}
+
+\lstset{
+basicstyle=\ttfamily,
+}
 
 \begin{document}
 
@@ -46,7 +52,37 @@ S-WiFi is the name of our application as well as our project. It stands for
 Smart WiFi, or whatever you think it is.
 
 \section{Downlink Transmissions}
+
 \section{Uplink Transmissions with PCF}
+In uplink transmissions with PCF, the server sends out a POLL packet to
+the client periodically. When the client receives the POLL packet, and has data
+to be transmitted, it replies with a data packet.
+
+Since ns-2 does not have a PCF module, we mimic the PCF behavior in the
+application layer. Specifically, we define a new packet type
+\lstinline|SWiFi_PKT_POLL|, and a new command ``poll'' for the S-WiFi
+application. We let node 0 call the poll command every \SI{10}{ms}.
+During the execution of the poll command, we create a new packet, set the packet
+type \lstinline|SWiFi_PKT_POLL| and record the current time as the send time in
+the packet header, and then send it out.
+
+When the client receives a packet and finds its packet type is
+\lstinline|SWiFi_PKT_POLL|, it acquires the send time, creates a new packet of
+type 2 (data packet from client to server), and carries the old send time in its
+header. Then it sets the packet size, fills the payload with its data message
+(a predefined string in our simulation), and sends it out.
+
+When the server receives a packet and finds it is a data packet from client to
+server, it decodes the data message and gets the old send time $T_\text{s}$ from
+the packet header. Let $T$ denote the current reception time. The
+round-trip-time (RTT) is calculated by:
+\begin{equation}
+	\text{RTT} = T - T_s
+\end{equation}
+Afterwards, the client calls a Tcl instproc (member function of a class
+in Tcl's terminology) \lstinline|recv| with the data message and RTT as the
+arguments. \lstinline|recv| simply stores the information into a log file.
+
 \section{Transmission Reliability}
 
 \begin{figure*}[h]
