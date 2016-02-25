@@ -80,6 +80,15 @@ switch -glob -nocase $mode {
 	}
 }
 puts "func: $func, mode: $mode"
+if {0 == [string compare $func "delay"]} {
+	if {$argc < 3} {
+		set retry 1
+	} else {
+		set retry [lindex $argv 2]
+	}
+} else {
+	set retry 0
+}
 
 # ======================================================================
 # Define options
@@ -107,7 +116,8 @@ set val(rp)             DumbAgent                  ;# routing protocol
 # ======================================================================
 
 set ns_		[new Simulator]
-set tracefd     [open SWiFi.tr w]
+set tracefname  [format "swifi_%s_%s.tr" $func $mode]
+set tracefd     [open $tracefname w]
 $ns_ trace-all $tracefd
 
 # set up topography object
@@ -138,16 +148,8 @@ Mac/802_11 set CWMax_         1
 Mac/802_11 set PreambleLength_  144                   ;# long preamble 
 Mac/802_11 set RTSThreshold_  5000
 Mac/802_11 set PLCPDataRate_  1.0e6                   ;# 1Mbps
-if {0 == [string compare $func "reliability"]} {
-    Mac/802_11 set ShortRetryLimit_       0               ;# retransmittions
-    Mac/802_11 set LongRetryLimit_        0               ;# retransmissions
-} elseif {0 == [string compare $func "delay"]} {
-    Mac/802_11 set ShortRetryLimit_       2               ;# retransmittions
-    Mac/802_11 set LongRetryLimit_        2               ;# retransmissions
-} else {
-    Mac/802_11 set ShortRetryLimit_       1               ;# retransmittions
-    Mac/802_11 set LongRetryLimit_        1               ;# retransmissions
-}
+Mac/802_11 set ShortRetryLimit_  [expr $retry + 1]    ;# retransmittions
+Mac/802_11 set LongRetryLimit_   [expr $retry + 1]    ;# retransmissions
 Mac/802_11 set TxFeedback_ 0;
 
 Agent/SWiFi set packet_size_ 1000
@@ -157,9 +159,13 @@ set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
 set datfname [format "swifi_%s_%s.dat" $func $mode]
 set datf [open $datfname w]
+if {0 == [string compare $func "delay"]} {
+	set delayfname [format "swifi_%s_%s_%d.dat" $func $mode $retry]
+	set delayf [open $delayfname w]
+}
 set n_rx 0
 Agent/SWiFi instproc recv {from rtt data} {
-	global logf n_rx func
+	global logf delayf n_rx func
 	set n_rx [expr $n_rx + 1]
         $self instvar node_
 	if {0 != [string compare $func "delay"]} {
@@ -169,6 +175,9 @@ Agent/SWiFi instproc recv {from rtt data} {
 	}
         puts $logf "Node [$node_ id] received reply from node $from\
 		with $rtt_name $rtt ms and message $data."
+	if {0 == [string compare $func "delay"]} {
+		puts $delayf "$rtt"
+	}
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
