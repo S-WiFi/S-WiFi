@@ -85,6 +85,9 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	packet_size_ = 0;
 	bind("packet_size_", &packet_size_);
 	bind("slot_interval_", &slot_interval_);
+	send_count_=0;
+	ack_count_=0;
+	reliability=0;
 }
 
 SWiFiAgent::~SWiFiAgent()
@@ -103,6 +106,8 @@ void SWiFiAgent::Reset()
 	}
 	client_list_.clear();
 	num_client_ = 0;
+	ack_count_=0;
+	send_count_=0;
 }
 // ************************************************
 // Table of commands:
@@ -124,6 +129,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			return (TCL_OK);
 		}
 		else if (strcmp (argv[1], "update_delivered") == 0){ //TODO: receive an ACK
+		        ack_count_ = ack_count_+1;		
 			return (TCL_OK);
 		}
 		else if (strcmp(argv[1], "update_failed") == 0){ //TODO: 
@@ -133,6 +139,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		else if (strcmp (argv[1], "restart") == 0){ //TODO: restart the simulation
 			Reset();
 			return (TCL_OK);
+			
 		}
 		else if (strcmp(argv[1], "report") == 0) { //TODO: Print data into a txt file
 			tracefile_.open("report.txt");
@@ -161,6 +168,8 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			// Broadcasting only. Need to specify ip and ACK address later on.			
 			send(pkt, 0);  
 			
+		        //count # of transmitted packets successfully
+			send_count_ = send_count_+1;
 			
 			
 
@@ -168,6 +177,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			// the command has been processed
 			return (TCL_OK);   
 		}
+		
 		else if (strcmp(argv[1], "poll") == 0) {
 			// Create a new POLL packet
 			Packet* pkt = allocpkt();
@@ -192,14 +202,23 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		}
 	}
 	else if (argc == 3) {
-        if (strcmp(argv[1], "mac") == 0){ 
+        	if (strcmp(argv[1], "mac") == 0){ 
 			mac_ = (Mac*)TclObject::lookup(argv[2]);
 			if(mac_ == 0) {
 			//TODO: printing...
 				printf("mac error!\n");
 			}
 			return (TCL_OK);
-		}	
+		}
+		else if (strcmp(argv[1], "calcu") == 0){
+		//reliability
+		reliability = ack_count_/send_count_;
+			Tcl& tcl = Tcl::instance();
+			tcl.evalf("%s relia %f %s", name(),reliability,argv[2]);
+			return (TCL_OK);
+		}
+		
+			
 	}
 	else if (argc == 5) {
 		if (strcmp(argv[1], "register") == 0) {
@@ -313,6 +332,8 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 					hdrip->src_.addr_ >> Address::instance().NodeShift_[1],
 					(Scheduler::instance().clock()-hdr->send_time_) * 1000,
 					data->data());
+					
+			
 		}
 		Packet::free(pkt);
 		return;
