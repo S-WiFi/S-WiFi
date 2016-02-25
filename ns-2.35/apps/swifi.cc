@@ -82,8 +82,7 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	client_list_ = vector<SWiFiClient*>();
 	is_server_ = 0;
 	target_ = 0;
-	packet_size_ = 0;
-	bind("packet_size_", &packet_size_);
+	bind("packet_size_", &size_);
 	bind("slot_interval_", &slot_interval_);
 }
 
@@ -155,9 +154,6 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->send_time_ = Scheduler::instance().clock();
 			// IP information  			
 			hdr_ip *ip = hdr_ip::access(pkt);
-			// Set packet size
-			size_ = packet_size_;
-			hdr->pkt_size_ = packet_size_;
 			// Broadcasting only. Need to specify ip and ACK address later on.			
 			send(pkt, 0);  
 			
@@ -182,8 +178,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
 			// Set packet size = 0
-			size_ = 0;
-			hdr->pkt_size_ = 0;
+			HDR_CMN(pkt)->size() = 0;
 			// Broadcasting only. Need to specify ip address later on.			
 			send(pkt, 0);
 			// return TCL_OK, so the calling function knows that
@@ -210,6 +205,8 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->qn_ = atoi(argv[2]);
 			hdr->tier_ = atoi(argv[3]);
 			hdr->init_ = atoi(argv[4]);
+			// Set packet size = 0
+			HDR_CMN(pkt)->size() = 0;
 			send(pkt, 0);     
 			return (TCL_OK);
 		}
@@ -283,6 +280,8 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 		//set the send_time field to the correct value
 		hdr_ACK->send_time_ = stime;
 		hdr_ACK->seq_ = rcv_seq;
+		// Set packet size = 0
+		HDR_CMN(pkt)->size() = 0;
 		//Fill in the data payload
 		char *msg = "I have received the packet!";
 		PacketData *data = new PacketData(1+strlen(msg));
@@ -353,9 +352,6 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			// Added by Andrei Gurtov for one-way delay measurement.
 			hdrret->rcv_time_ = Scheduler::instance().clock();
 			hdrret->seq_ = rcv_seq;
-			// Set packet size
-			size_ = packet_size_;
-			hdrret->pkt_size_ = packet_size_;
 			// Fill in the data payload
 			char *msg = "I'm feeling great!";
 			PacketData *data = new PacketData(1 + strlen(msg));
