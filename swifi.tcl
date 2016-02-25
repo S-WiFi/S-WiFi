@@ -158,6 +158,16 @@ set logf [open $logfname w]
 set datfname [format "swifi_%s_%s.dat" $func $mode]
 set datf [open $datfname w]
 set n_rx 0
+
+
+
+Agent/SWiFi instproc relia {reliability k} {
+	global datf distance
+        puts $datf "$distance($k) $reliability"
+	flush $datf		
+}
+
+
 Agent/SWiFi instproc recv {from rtt data} {
 	global logf n_rx func
 	set n_rx [expr $n_rx + 1]
@@ -293,10 +303,10 @@ $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 #	$mysw update_failed 
 #}
 
-#Mac/802_11 instproc txsucceed {} {
-#	upvar sw_(0) mysw
-#	$mysw update_delivered 
-#}
+Mac/802_11 instproc txsucceed {} {
+	upvar sw_(0) mysw
+	$mysw update_delivered 
+}
 
 #Mac/802_11 instproc brdsucced {} {
 #}
