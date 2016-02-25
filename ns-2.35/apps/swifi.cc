@@ -179,6 +179,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
+			agent_send_time_ = Scheduler::instance().clock();
 			// Set packet size = 0
 			size_ = 0;
 			hdr->pkt_size_ = 0;
@@ -210,10 +211,10 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				// which allows the user to react to the poll result.
 				// Calculate the round trip time
 				Tcl& tcl = Tcl::instance();
-				tcl.evalf("%s recv %d %3.1f \"%s\"", name(),
+				tcl.evalf("%s recv %d %3.3f \"%s\"", name(),
 					(atoi(argv[3])), (atof(argv[2]) - agent_send_time_) * 1000,
-					(" "));
-				printf("succeed! delay is %f ms\n", (atof(argv[2]) - agent_send_time_)*1000);
+					("This is a 802.11 ACK!"));
+				//printf("succeed! delay is %f ms\n", (atof(argv[2]) - agent_send_time_)*1000);
 			}
 			return (TCL_OK);
 		}
@@ -274,7 +275,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			// which allows the user to react to the poll result.
 			// Calculate the round trip time
 			Tcl& tcl = Tcl::instance();
-			tcl.evalf("%s recv %d %3.1f \"%s\"", name(),
+			tcl.evalf("%s recv %d %3.3f \"%s\"", name(),
 					hdrip->src_.addr_ >> Address::instance().NodeShift_[1],
 					(Scheduler::instance().clock()-hdr->send_time_) * 1000,
 					data->data());

@@ -2070,13 +2070,29 @@ Mac802_11::recvACK(Packet *p)
 		}
 		goto done;
 	}
+
+	// Use tcl.eval to call the Tcl
+	// interpreter with the poll results.
+	// Note: In the Tcl code, a procedure
+	// 'Mac/802_11 txsucceed' has to be defined
+	// which allows the mac to give feedback to
+	// the application.
+	if (macmib_.getTxFeedback() == 1){
+		Tcl& tcl = Tcl::instance();
+		tcl.evalf("%s txsucceed %f %d", name(), Scheduler::instance().clock(),0);
+		//hdrip->src_.addr_ >> Address::instance().NodeShift_[1]);
+	}
+
 	if(tx_state_ != MAC_SEND) {
-		discard(p, DROP_MAC_INVALID_STATE);
-		if (macmib_.getTxFeedback() == 1){
+		//if (macmib_.getTxFeedback() == 1 && tx_state_ == MAC_IDLE) {
 			//Tcl& tcl = Tcl::instance();
 			//tcl.evalf("%s txfailed", name());
-		}
-		return;
+		//}
+		//else {
+			discard(p, DROP_MAC_INVALID_STATE);
+			printf("DROP_MAC_INVALID_STATE! MAC state is %d\n", tx_state_);
+			return;
+		//}
 	}
 
 	assert(pktTx_);
@@ -2097,18 +2113,6 @@ Mac802_11::recvACK(Packet *p)
 		slrc_ = 0;
 	rst_cw();
 
-
-	// Use tcl.eval to call the Tcl
-	// interpreter with the poll results.
-	// Note: In the Tcl code, a procedure
-	// 'Mac/802_11 txsucceed' has to be defined
-	// which allows the mac to give feedback to
-	// the application.
-	if (macmib_.getTxFeedback() == 1){
-		Tcl& tcl = Tcl::instance();
-		tcl.evalf("%s txsucceed %f %d", name(), Scheduler::instance().clock(), 
-		hdrip->src_.addr_ >> Address::instance().NodeShift_[1]);
-	}
 
 	Packet::free(pktTx_); 
 	pktTx_ = 0;
