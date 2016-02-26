@@ -142,7 +142,7 @@ Propagation/Shadowing set dist0_ 1.0        ;# reference distance (m)
 Propagation/Shadowing set seed_ 0           ;# seed for RNG
 
 Mac/802_11 set dataRate_  11.0e6
-Mac/802_11 set basicRate_ 11.0e6
+Mac/802_11 set basicRate_ 1.0e6
 Mac/802_11 set CWMin_         1
 Mac/802_11 set CWMax_         1
 Mac/802_11 set PreambleLength_  144                   ;# long preamble 
@@ -255,8 +255,8 @@ $ns_ at 3.0 "$sw_(1) register 1 1 0"
 
 set period     100.0
 if {0 == [string compare $func "reliability"]} {
-	set num_runs   10
-	set delta_dist 250
+	set num_runs   21
+	set delta_dist 100
 } else {
 	set num_runs   1
 }
@@ -265,7 +265,7 @@ if {0 != [string compare $func "delay"]} {
 	set interval 0.01
 } else {
 	# RTT is acquired from measurements in Problem 1&2.
-	set rtt 0.0015
+	set rtt 0.001625
 	set interval [expr 2 * $rtt]
 }
 

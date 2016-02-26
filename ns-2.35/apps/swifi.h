@@ -39,7 +39,6 @@ struct hdr_swifi {
 	double send_time_;  // when a packet sent from the transmitter
  	double rcv_time_;	// when a packet arrived to receiver
  	int seq_;		    // sequence number
-	int pkt_size_;      // size of a packet
 
  	//For register packet
  	double qn_;   // user demand in packets
@@ -83,13 +82,11 @@ public:
 	virtual int command(int argc, const char*const* argv); //TODO: blablabla...
 	virtual void recv(Packet*, Handler*); //TODO: blablabla...
 
-	void SetPacketSize(int s){ packet_size_ = s;}
 	void Reset(); //TODO: For server to reset parameters
 
 protected:
 	u_int32_t Ackaddr_;    // IP address for incoming ACK packet
 	double slot_interval_; // time length of a single slot
-	unsigned int packet_size_; // size of payload
 	Mac* mac_;             // MAC
 	SWiFiClient* target_;  // Only for server: showing the current target client 
 	ofstream tracefile_;   // For outputting user-defined trace file
