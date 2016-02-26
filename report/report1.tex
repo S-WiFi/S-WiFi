@@ -23,7 +23,7 @@ basicstyle=\ttfamily,
 
 \begin{document}
 
-\title{ECEN 689: Real-Time Wireless Networks\\ Project 1, due on 2/26}
+\title{\bf ECEN 689-- Real-Time Wireless Networks: Project 1\\ (Due on 2/26)}
 \date{}
 \author{%
 Ping-Chun Hsieh\\
@@ -51,9 +51,69 @@ respectively.
 S-WiFi is the name of our application as well as our project. It stands for
 Smart WiFi, or whatever you think it is.
 
-\section{Downlink Transmissions}
+\section*{Simulation Setup}
+\begin{table}[htbp]
+\centering
+    \caption{Parameters of the wireless channel.}
+    \vspace{2mm}
+    \begin{tabular}{ | l | l | }
+    \hline
+    Item & Value \\ \hline
+    Path loss exponent & 2.0  \\ \hline
+    Shadowing deviation & \SI{4.0}{dB} \\ \hline
+    Reference distance & \SI{1.0}{m} \\
+    \hline
+\end{tabular}
+\label{table: channel}
+\end{table}
+Throughout the report, we consider a single wireless link between two devices, say A and B. The transmitter power level is 1 Watt. We use the shadowing module as the wireless channel. The parameters of the channel are summarized in Table \ref{table: channel}.
 
+\begin{table}[htbp]
+\centering
+\caption{Parameters of the 802.11b MAC.}
+    \vspace{2mm}
+    \begin{tabular}{ | l | l | }
+    \hline
+    Item & Value \\ \hline
+    Data rate & \SI{11}{Mb/s}  \\ \hline
+    Basic rate & \SI{1}{Mb/s}  \\ \hline
+    PLCP data rate & \SI{1}{Mb/s}  \\ \hline 
+    Preamble length & \SI{144}{bits} \\ \hline
+    Slot time & \SI{20}{\mu s} \\ \hline
+    SIFS & \SI{10}{\mu s} \\
+    \hline
+\end{tabular}
+\label{table: mac}
+\end{table}
+
+For the medium access control (MAC) layer, we use the 802.11 module built in ns-2. Following the IEEE 802.11b standard, the MAC layer parameters are chosen as in Table \ref{table: mac}.
+
+
+\section{Downlink Transmissions}
+\label{section: downlink}
+\subsection{Proposed Design in NS-2}
+For downlink transmissions, the server transmits a data packet to the client periodically. As the client receives the data packet successfully, it replies an application ACK to the server.
+
+In the S-WiFi application, we define a new packet type \lstinline|SWiFi_PKT_ACK| to measure different timings. Although the 802.11 MAC has a default ACK packet type, the default ACK frame includes no timing information or packet sequence number, which are required in timing measurement (especially in the case with automatic retry of 802.11). To be fully compatible with the original 802.11 MAC, we choose to create a new ACK in the application.
+
+In the S-WiFi application, we define a new command ``send'', and let node 0 call the send command every \SI{10}{ms} in the Tcl domain. When the send command is called, the S-WiFi application will create a packet of size 1000 bytes and record the current timestamp, denoted by $T_s$, in the packet header as the send time in the application layer, and then send it to the client.
+
+When the client receives the data packet and verifies the packet type in the header, it further extracts the send time $T_s$ in the header of the received packet. Then, the client creates a \lstinline|SWiFi_PKT_ACK| packet with $T_s$ attached in the header, and then reply this packet to the server.
+
+As the server receives the \lstinline|SWiFi_PKT_ACK| packet, it decodes the header and retrieves the old send time $T_s$ and checks the current timestamp upon reception. Let $T_r$ denote the current reception time. The round-trip time of downlink transmission can be calculated by:
+\begin{equation}
+\textrm{RTT}=T_r - T_s
+\end{equation}
+Afterwards, the client calls a Tcl instproc (member function of a class
+in Tcl's terminology) \lstinline|recv| with the data message and RTT as the
+arguments. \lstinline|recv| simply stores the information into a log file.
+The overall process of downlink transmission is summarized in Fig \ref{figure: rtt}(a). 
+
+\subsection{Simulation Results}
+Under the simulation setup described in previous sections, the downlink RTT = \SI{1.625}{ms} when the distance between A and B is \SI{1}{m} and the packet size is \SI{1000}{bytes}. 
 \section{Uplink Transmissions with PCF}
+\label{section: uplink}
+\subsection{Proposed Design in NS-2}
 In uplink transmissions with PCF, the server sends out a POLL packet to
 the client periodically. When the client receives the POLL packet, and has data
 to be transmitted, it replies with a data packet.
@@ -61,7 +121,7 @@ to be transmitted, it replies with a data packet.
 Since ns-2 does not have a PCF module, we mimic the PCF behavior in the
 application layer. Specifically, we define a new packet type
 \lstinline|SWiFi_PKT_POLL|, and a new command ``poll'' for the S-WiFi
-application. We let node 0 call the poll command every \SI{10}{ms}.
+application. We let node 0 call the poll command every {10}{ms}.
 During the execution of the poll command, we create a new packet, set the packet
 type \lstinline|SWiFi_PKT_POLL| and record the current time as the send time in
 the packet header, and then send it out.
@@ -74,24 +134,82 @@ header. Then it sets the packet size, fills the payload with its data message
 
 When the server receives a packet and finds it is a data packet from client to
 server, it decodes the data message and gets the old send time $T_\text{s}$ from
-the packet header. Let $T$ denote the current reception time. The
-round-trip-time (RTT) is calculated by:
-\begin{equation}
-	\text{RTT} = T - T_s
-\end{equation}
+the packet header. Besides, upon receiving the packet, the server gets the currentstamp denoted by $T_r$. The RTT of uplink transmission is 
 Afterwards, the client calls a Tcl instproc (member function of a class
 in Tcl's terminology) \lstinline|recv| with the data message and RTT as the
 arguments. \lstinline|recv| simply stores the information into a log file.
+The process of uplink transmission is summarized in Fig \ref{figure: rtt}(b). \\
+
+\subsection{Simulation Results}
+Under the simulation setup described in previous sections, the uplink RTT = \SI{1.625}{ms} when the distance between A and B is \SI{1}{m} and the packet size is \SI{1000}{bytes}. \\
+
+\begin{figure}[htbp]
+\centering
+\subfigure[Downlink round-trip time.]{
+\includegraphics[scale = 0.7]{downlink_rtt.pdf}}
+\subfigure[Uplink round-trip time.]{
+\includegraphics[scale = 0.7]{uplink_rtt.pdf}}
+\caption{Round-trip time when node A and node B are close to each other.}
+\label{figure: rtt}
+\end{figure}
 
 \section{Transmission Reliability}
+\subsection{Implementation}
 
-\begin{figure*}[h]
+\subsection{Simulation Results}
+\begin{figure}[htbp]
 \centering
-\includegraphics[width=3.5in]{p3_uplink.eps}
-\caption{Reliability versus distance for uplink transmissions.}
-\end{figure*}
+\subfigure[Reliability of downlink transmissions.]{
+\includegraphics[scale=0.35]{p3_downlink.eps}}
+\subfigure[Reliability of uplink transmissions.]{
+\includegraphics[scale=0.35]{p3_uplink.eps}}
+\caption{Reliability versus distance.}
+\label{figure: reliability}
+\end{figure}
 
 \section{Measuring Delays}
+\subsection{Implementation}
+To measure the delay of packet delivery, we first enable the automatic retry function in 802.11 MAC. This can be done by setting the \lstinline|ShortRetryLimit_| and \lstinline|LongRetryLimit_| in the 802.11 MAC. Recall the downlink transmission described in Section \ref{section: downlink}. Let $T_{send}$ still be the time at which the server creates a data packet intended for the client, and let $T_{recv}$ be the time when the server receives the corresponding \lstinline|SWiFi_PKT_ACK| from the client. The packet delay is simply calculated by $T_{recv}-T_{send}$. However, since it is possible that a node takes multiple transmissions to deliver one packet successfully, packet delay is greater than or equal to RTT. For example, in Figure \ref{figure: downlink delay}, node A delivers a data packet after 1 retry and node B replies a SWiFi ACK successfully using two transmissions.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[scale = 0.7]{downlink_delay.pdf}
+\caption{Downlink packet delay with automatic retransmissions.}
+\label{figure: downlink delay}
+\end{figure}
+
+Similarly, for uplink transmission, let $T_{send}$ still be the time when the server creates a \lstinline|SWiFi_PKT_POLL| packet and $T_{recv}$ be the time when the server receives the data packet sent by the client. Then, the packet delay can again be calculated by $T_{recv}-T_{send}$. Figure \ref{figure: uplink delay} shows the packet delay of uplink transmission with automatic retry.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[scale = 0.7]{uplink_delay.pdf}
+\caption{Uplink packet delay with automatic retransmissions.}
+\label{figure: uplink delay}
+\end{figure}
+
+\subsection{Simulation Results}
+The packet delay is measured under the channel reliability of $55\%$. From Figure \ref{figure: reliability}(a) and \ref{figure: reliability}(b), we choose the distance between A and B to be \SI{1000}{m} for both uplink and downlink transmission.
+
+\begin{figure}[htbp]
+\centering
+\subfigure[CDF of delay with retry limit 0 and 1.]{
+\includegraphics[scale=0.35]{p4_downlink_1.eps}}
+\subfigure[CDF of delay with retry limit 2, 3, 4, and 5.]{
+\includegraphics[scale=0.35]{p4_downlink_2.eps}}
+\caption{Probability distribution of packet delay of downlink transmission.}
+\label{figure: downlink delay cdf}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\subfigure[CDF of delay with retry limit 0 and 1.]{
+\includegraphics[scale=0.35]{p4_uplink_1.eps}}
+\subfigure[CDF of delay with retry limit 2, 3, 4, and 5.]{
+\includegraphics[scale=0.35]{p4_uplink_2.eps}}
+\caption{Probability distribution of packet delay of uplink transmission.}
+\label{figure: ruplink delay cdf}
+\end{figure}
+
 \section{Preferences for Final Report}
 We prefer topic 2 to topic 3, and prefer topic 3 to topic 1. ($2 \succ 3 \succ 1$)
 
