@@ -96,14 +96,14 @@ In the S-WiFi application, we define a new command ``send'', and let node 0 call
 
 When the client receives the data packet and verifies the packet type in the header, it extracts the send time $T_s$ in the header of the received packet. Then, the client creates a \lstinline|SWiFi_PKT_ACK| packet with $T_s$ attached in the header, and then reply this packet to the server.
 
-As the server receives the \lstinline|SWiFi_PKT_ACK| packet, it decodes the header and retrieves the old send time $T_s$ and checks the current timestamp upon reception. Let $T_r$ denote the current reception time. The round-trip time of downlink transmission can be calculated by:
+As the server receives the \lstinline|SWiFi_PKT_ACK| packet, it decodes the header and retrieves the old send time $T_s$ and checks the current timestamp upon reception. Let $T_r$ denote the current reception time. The round-trip time of a downlink transmission can be calculated by:
 \begin{equation}\label{equation: rtt}
 \textrm{RTT}=T_r - T_s
 \end{equation}
 Afterwards, the client calls a Tcl instproc (member function of a class
 in Tcl's terminology) \lstinline|recv| with the data message and RTT as the
 arguments. \lstinline|recv| simply stores the information into a log file.
-The overall process of downlink transmission is summarized in Figure \ref{figure: rtt}(a). 
+The overall process of a downlink transmission is summarized in Figure \ref{figure: rtt}(a). 
 
 \subsection{Simulation Results}
 Under the simulation setup described above, the downlink RTT = \SI{1.625}{ms} when the distance between A and B is \SI{1}{m} and the packet size is \SI{1000}{bytes}. 
@@ -130,8 +130,8 @@ header. Then it sets the packet size, fills the payload with its data message
 
 When the server receives a packet and finds it is a data packet from client to
 server, it decodes the data message and gets the old send time $T_\text{s}$ from
-the packet header. Besides, upon receiving the packet, the server gets the current timestamp denoted by $T_r$. The RTT of uplink transmission can be calculated as in (\ref{equation: rtt}).
-To output the RTT information into a log file, the client calls \lstinline|recv| with the data message and RTT as the arguments. The process of uplink transmission is summarized in Figure \ref{figure: rtt}(b).
+the packet header. Besides, upon receiving the packet, the server gets the current timestamp denoted by $T_r$. The RTT of a uplink transmission can be calculated as in (\ref{equation: rtt}).
+To output the RTT information into a log file, the client calls \lstinline|recv| with the data message and RTT as the arguments. The process of a uplink transmission is summarized in Figure \ref{figure: rtt}(b).
 
 \subsection{Simulation Results}
 Under the simulation setup described in previous sections, the uplink RTT = \SI{1.625}{ms} when the distance between A and B is \SI{1}{m} and the packet size is \SI{1000}{bytes}. \\
