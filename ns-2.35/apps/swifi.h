@@ -85,6 +85,9 @@ public:
 
 	void SetPacketSize(int s){ packet_size_ = s;}
 	void Reset(); //TODO: For server to reset parameters
+	unsigned int send_count_; // # of transmitted packets 
+        unsigned int ack_count_;  // # of packtes that are received successfully
+        double reliability;
 
 protected:
 	u_int32_t Ackaddr_;    // IP address for incoming ACK packet
