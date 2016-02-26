@@ -83,6 +83,15 @@ Afterwards, the client calls a Tcl instproc (member function of a class
 in Tcl's terminology) \lstinline|recv| with the data message and RTT as the
 arguments. \lstinline|recv| simply stores the information into a log file.
 
+\begin{figure*}[h]
+\centering
+\subfigure[Downlink round-trip time.]{
+\includegraphics[scale = 0.7]{downlink_rtt.pdf}}
+\subfigure[Uplink round-trip time.]{
+\includegraphics[scale = 0.7]{uplink_rtt.pdf}}
+\caption{Round-trip time when node A and node B are close to each other.}
+\end{figure*}
+
 \section{Transmission Reliability}
 
 \begin{figure*}[h]
@@ -92,6 +101,20 @@ arguments. \lstinline|recv| simply stores the information into a log file.
 \end{figure*}
 
 \section{Measuring Delays}
+
+\begin{figure*}[h]
+\centering
+\includegraphics[scale = 0.7]{downlink_delay.pdf}
+\caption{Downlink packet delay with automatic retransmissions.}
+\end{figure*}
+
+\begin{figure*}[h]
+\centering
+\includegraphics[scale = 0.7]{uplink_delay.pdf}
+\caption{Uplink packet delay with automatic retransmissions.}
+\end{figure*}
+
+
 \section{Preferences for Final Report}
 We prefer topic 2 to topic 3, and prefer topic 3 to topic 1. ($2 \succ 3 \succ 1$)
 
