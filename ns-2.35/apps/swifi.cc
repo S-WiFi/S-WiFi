@@ -254,7 +254,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			// which allows the user to react to the poll result.
 			// Calculate the round trip time
 			Tcl& tcl = Tcl::instance();
-			tcl.evalf("%s recv %d %3.1f \"%s\"", name(),
+			tcl.evalf("%s recv %d %.3f \"%s\"", name(),
 					hdrip->src_.addr_ >> Address::instance().NodeShift_[1],
 					(Scheduler::instance().clock()-hdr->send_time_) * 1000,
 					data->data());
@@ -308,7 +308,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			// which allows the user to react to the poll result.
 			// Calculate the round trip time
 			Tcl& tcl = Tcl::instance();
-			tcl.evalf("%s recv %d %3.1f \"%s\"", name(),
+			tcl.evalf("%s recv %d %.3f \"%s\"", name(),
 					hdrip->src_.addr_ >> Address::instance().NodeShift_[1],
 					(Scheduler::instance().clock()-hdr->send_time_) * 1000,
 					data->data());
