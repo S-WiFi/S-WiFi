@@ -123,8 +123,8 @@ type \lstinline|SWiFi_PKT_POLL| and record the current time as the send time in
 the packet header, and then send it out.
 
 When the client receives a packet and finds its packet type is
-\lstinline|SWiFi_PKT_POLL|, it acquires the send time, creates a new packet of
-type 2 (data packet from client to server), and carries the old send time in its
+\lstinline|SWiFi_PKT_POLL|, it acquires the send time, creates a new packet whose type is
+data from client to server, and carries the old send time in its
 header. Then it sets the packet size, fills the payload with its data message
 (a predefined string in our simulation), and sends it out.
 
