@@ -265,7 +265,7 @@ if {0 != [string compare $func "delay"]} {
 	set interval 0.01
 } else {
 	# RTT is acquired from measurements in Problem 1&2.
-	set rtt 0.0015
+	set rtt 0.001625
 	set interval [expr 2 * $rtt]
 }
 
