@@ -255,8 +255,8 @@ $ns_ at 3.0 "$sw_(1) register 1 1 0"
 
 set period     100.0
 if {0 == [string compare $func "reliability"]} {
-	set num_runs   10
-	set delta_dist 250
+	set num_runs   21
+	set delta_dist 100
 } else {
 	set num_runs   1
 }
