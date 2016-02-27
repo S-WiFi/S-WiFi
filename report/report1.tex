@@ -189,8 +189,7 @@ The packet delay is measured under the channel reliability of about $55\%$. From
 
 Figure \ref{figure: downlink delay cdf} shows the cumulative distribution function (CDF) of delays of downlink transmissions with automatic retry limit from 0 to 5. When the retry limit is 0, the delay is about \SI{1.6}{ms} for all the packets. This is because every packet has to be either delivered in one transmission or simply dropped by the 802.11 MAC. When the retry limit is 1, each node might take either one or two transmissions to deliver a packet. Moreover, some packets might be queued in the MAC layer so that the real send timestamp in the MAC layer can be much larger than the packet generation timestamp in the application layer. When the retry limit is greater than or equal to 2, the queueing delay dominates the delay of packet delivery. 
 
-Similar to downlink, uplink transmissions exhibit the same delay pattern as shown in Figure \ref{figure: uplink delay cdf}. {\bf [EXPLAIN why uplink has smaller delays]}
-Table \ref{table: average delay} shows the average packet delay of both downlink and uplink transmissions with different retry limits.  
+Similar to downlink, uplink transmissions exhibit the same delay pattern as shown in Figure \ref{figure: uplink delay cdf}. Table \ref{table: average delay} lists the average packet delay of both downlink and uplink transmissions with different retry limits. When the retry limit is greater than 1, the average delay grows roughly linearly with the retry limit. Besides, we find that uplink has smaller delays than downlink in general. From the trace, we observe that it takes more time for 802.11 MAC to resend a big data packet than a zero-size POLL packet. We also find MAC layer ACK packets are always dropped due to invalid state (\lstinline|DROP_MAC_INVALID_STATE|). The exact reason for such behavior is to be explored.
 
 \begin{figure}[htbp]
 \centering
