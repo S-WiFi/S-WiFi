@@ -90,6 +90,7 @@ protected:
 	Mac* mac_;             // MAC
 	SWiFiClient* target_;  // Only for server: showing the current target client 
 	ofstream tracefile_;   // For outputting user-defined trace file
+	int queue_length_;     // Number of packets in the queue of a client
 
 };
 

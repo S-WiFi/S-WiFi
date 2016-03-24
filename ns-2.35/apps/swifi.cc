@@ -82,6 +82,7 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	client_list_ = vector<SWiFiClient*>();
 	is_server_ = 0;
 	target_ = 0;
+	queue_length_ = 0;
 	bind("packet_size_", &size_);
 	bind("slot_interval_", &slot_interval_);
 }
@@ -187,14 +188,26 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		}
 	}
 	else if (argc == 3) {
-        if (strcmp(argv[1], "mac") == 0){ 
+	        if (strcmp(argv[1], "mac") == 0){ 
 			mac_ = (Mac*)TclObject::lookup(argv[2]);
 			if(mac_ == 0) {
 			//TODO: printing...
 				printf("mac error!\n");
 			}
 			return (TCL_OK);
-		}	
+		}
+		if (strcmp(argv[1], "pour") == 0){
+			if (atoi(argv[2]) >= 0) {
+				queue_length_ += atoi(argv[2]);
+				// printf("current queue length = %d \n", queue_length_);
+				Tcl& tcl = Tcl::instance();
+				tcl.evalf("%s qlog %d", name(), queue_length_);			
+			}
+			else {
+				printf("arrivals should be nonnegative!\n");
+			}
+			return (TCL_OK);
+		}
 	}
 	else if (argc == 5) {
 		if (strcmp(argv[1], "register") == 0) {
@@ -336,29 +349,33 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	else if (hdr->ret_ == SWiFi_PKT_POLL) {
 		// Send a data packet from the client to the server.
 		if (!is_server_) {
-			// First save the old packet's send_time
-			double stime = hdr->send_time_;
-			int rcv_seq = hdr->seq_;
-			// Discard the packet
-			Packet::free(pkt);
-			// Create a new packet
-			Packet* pktret = allocpkt();
-			// Access the packet header for the new packet:
-			hdr_swifi* hdrret = hdr_swifi::access(pktret);
-			// Set ret to 2 (data packet from client to server)
-			hdrret->ret_ = 2;
-			// Set the send_time field to the correct value
-			hdrret->send_time_ = stime;
-			// Added by Andrei Gurtov for one-way delay measurement.
-			hdrret->rcv_time_ = Scheduler::instance().clock();
-			hdrret->seq_ = rcv_seq;
-			// Fill in the data payload
-			char *msg = "I'm feeling great!";
-			PacketData *data = new PacketData(1 + strlen(msg));
-			strcpy((char*)data->data(), msg);
-			pktret->setdata(data);
-			// Send the packet
-			send(pktret, 0);
+			if (queue_length_ > 0){
+				// First save the old packet's send_time
+				double stime = hdr->send_time_;
+				int rcv_seq = hdr->seq_;
+				// Discard the packet
+				Packet::free(pkt);
+				// Create a new packet
+				Packet* pktret = allocpkt();
+				// Access the packet header for the new packet:
+				hdr_swifi* hdrret = hdr_swifi::access(pktret);
+				// Set ret to 2 (data packet from client to server)
+				hdrret->ret_ = 2;
+				// Set the send_time field to the correct value
+				hdrret->send_time_ = stime;
+				// Added by Andrei Gurtov for one-way delay measurement.
+				hdrret->rcv_time_ = Scheduler::instance().clock();
+				hdrret->seq_ = rcv_seq;
+				// Fill in the data payload
+				char *msg = "I'm feeling great!";
+				PacketData *data = new PacketData(1 + strlen(msg));
+				strcpy((char*)data->data(), msg);
+				pktret->setdata(data);
+				// Update queue length
+				queue_length_--;
+				// Send the packet
+				send(pktret, 0);
+			}
 		}
 	}
 }
