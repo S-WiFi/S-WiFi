@@ -262,12 +262,16 @@ if {0 == [string compare $func "reliability"]} {
 }
 set num_trans  10000
 if {0 != [string compare $func "delay"]} {
-	set interval 0.01
+	set slot 0.01
 } else {
 	# RTT is acquired from measurements in Problem 1&2.
 	set rtt 0.001625
-	set interval [expr 2 * $rtt]
+	set slot [expr 2 * $rtt]
 }
+# specify the number of slots in an interval
+set interval 20
+set rand_min 1
+set rand_max 10
 
 if {0 == [string compare $mode "uplink"]} {
 	set command "$sw_(0) poll"
@@ -286,7 +290,12 @@ for {set k 0} {$k < $num_runs} {incr k} {
 		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart"
 	}
 	for {set i 0} {$i < $num_trans} {incr i} {
-		$ns_ at [expr $period * ($k + 1) + $i * $interval] "$command"
+		$ns_ at [expr $period * ($k + 1) + $i * $slot] "$command"
+		if { $i % $interval == 0} {
+			for {set j 1} {$j < $val(nn)} {incr j} {
+				$ns_ at [expr $period * ($k + 1) + $i * $slot - 0.0001] "sw_(j) pour [rand_int $rand_min $rand_max]"
+			}
+		}
 	}
 	$ns_ at [expr $period*($k + 2) - 0.003] "$sw_(0) stat $k"
 }
@@ -315,6 +324,10 @@ proc stop {} {
 	$ns_ flush-trace
 	close $tracefd
 	close $logf
+}
+
+proc rand_int { min max } {
+	return [expr {int(rand()*($max-$min+1) + $min)}]
 }
 
 puts "Starting simulation..."
