@@ -437,7 +437,7 @@ fi
 blame='Tk is not part of the ns project.  Please see www.Scriptics.com
 to see if they have a fix for your platform.'
 autoconf
-./configure --enable-gcc --disable-shared --disable-xft --disable-xss --prefix=$CUR_PATH || die "tk$TKVER configuration failed! Exiting ..."
+./configure --enable-gcc --enable-shared --enable-xft --enable-64bit --disable-rpath --disable-xss --prefix=$CUR_PATH || die "tk$TKVER configuration failed! Exiting ..."
 if make 
 then
 	echo "tk$TKVER build succeeded."
