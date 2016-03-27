@@ -88,12 +88,11 @@ public:
 	
 	
 	//for maxweight schedule
+private:
 	vector<double> Q_(num_client_);//queue
 	vector<double> pn_(num_client_);//channel reliability
-	int c ;//potential service at queue
-	double Qmax_;//the max Queue
-	vector<int> client_scheduling_;// For a server to handle scheduling among clients  
 	int target_client_;//target client
+	vector<int> client_scheduling_;// For a server to handle scheduling among clients  
 	
 	/*
 	vector<double> Q_col(T);

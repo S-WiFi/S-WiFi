@@ -90,11 +90,13 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 //Schedule Max Weight policy
 SWiFiAgent::Schedule_Max_Weight()	  
 {
-       c = 1;
+       int c=1 ;//potential service at queue
+       double Qmax_;//the max Queue
+       
        for(unsigned int n = 0; n<num_client_;n++){
-       pn_.push_back(1);//assume channel reliability=1
-       double a = ( (double) rand() /(RAND_MAX) )* 21; //arrive rate
-       Q_[n] = pn_[pn_.size()-1]*( Q_[n]-min(pn_[pn_.size()-1]*c,Q_[n]) + a );//queue of client n, arrive rate doesn't initialized!!!
+       //assume channel reliability pn_=1
+       //a is arrival rate
+       Q_[n] = pn_[pn_.size()-1]*( Q_[n]-min(pn_[pn_.size()-1]*c,Q_[n]) + a );//queue of client n
        cout << "Q_[" << n << "]" << ": ";//print every client's queue 
        cout<<Q_[n]<<endl;
        }
