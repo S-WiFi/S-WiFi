@@ -18,9 +18,11 @@
 #include "mac.h"
 #include <vector>   
 #include <fstream>  // For outputting data
+#include <algorithm> //for min
 using std::vector;
 using std::endl;
 using std::ofstream;
+using std::min;
 
 enum swifi_pkt_t {
 	SWiFi_PKT_POLL = 10,
@@ -83,7 +85,27 @@ public:
 	virtual void recv(Packet*, Handler*); //TODO: blablabla...
 
 	void Reset(); //TODO: For server to reset parameters
-
+	
+	
+	//for maxweight schedule
+	vector<double> Q_(num_client_);//queue
+	vector<double> pn_(num_client_);//channel reliability
+	int c ;//potential service at queue
+	double Qmax_;//the max Queue
+	vector<int> client_scheduling_;// For a server to handle scheduling among clients  
+	int target_client_;//target client
+	
+	/*
+	vector<double> Q_col(T);
+	vector<vector<double>> Q_2d(num_client_,Q_col);//Queue
+	double pn_=1;//channel reliability
+	int b=1 ;//potential service at queue
+	vector<double> A_col(T);
+	vector<vector<double>> A_2d(num_client_,A_col);//arrival rate
+        vector<double> Qmax_(period);//the max Queue
+        vector<int> client_list_(period);// For a server to handle scheduling among clients
+        */
+        
 protected:
 	u_int32_t Ackaddr_;    // IP address for incoming ACK packet
 	double slot_interval_; // time length of a single slot
