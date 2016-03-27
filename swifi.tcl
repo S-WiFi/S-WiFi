@@ -36,12 +36,12 @@
 # Handle command line arguments
 # ======================================================================
 if {$argc < 1} {
-	set func "rtt"
+	set func "pcf"
 } else {
 	set func [lindex $argv 0]
 }
 if {$argc < 2} {
-	set mode "downlink"
+	set mode "baseline"
 } else {
 	set mode [lindex $argv 1]
 }
@@ -50,8 +50,8 @@ if {$argc < 2} {
 proc usage {} {
 	global argv0
 	puts "$argv0 func mode"
-	puts "    func    One of rtt (default), reliability, and delay"
-	puts "    mode    One of downlink (default), uplink"
+	puts "    func    pcf(default), rtt, reliability, and delay"
+	puts "    mode    baseline(default) or smart for pcf; downlink or uplink for rtt/reliability/delay"
 	exit 0
 }
 switch -glob -nocase $func {
@@ -64,6 +64,9 @@ switch -glob -nocase $func {
 	rt* {
 		set func "rtt"
 	}
+	p* {
+		set func "pcf"
+	}
 	default {
 		usage
 	}
@@ -75,20 +78,40 @@ switch -glob -nocase $mode {
 	u* {
 		set mode "uplink"
 	}
+	b* {
+		set mode "baseline"
+	}
+	s* {
+		set mode "smart"
+	}
 	default {
 		usage
 	}
 }
-puts "func: $func, mode: $mode"
-if {0 == [string compare $func "delay"]} {
-	if {$argc < 3} {
+if {0 == [string compare $func "pcf"]} {
+	if {0 == [string compare $mode "baseline"] || 0 == [string compare $mode "smart"]} {
 		set retry 1
 	} else {
-		set retry [lindex $argv 2]
+		usage
 	}
-} else {
-	set retry 0
+} else  {
+	  if {0 == [string compare $mode "uplink"] || 0 == [string compare $mode "downlink"]} {
+		if {0 == [string compare $func "delay"]} {
+			if {$argc < 3} {
+				set retry 1
+			} else {
+				set retry [lindex $argv 2]
+			}
+		}
+		else {
+			set retry 1
+	  	}
+	  } else {
+ 		usage
+	  }
 }
+
+puts "func: $func, mode: $mode"
 
 # ======================================================================
 # Define options
@@ -285,12 +308,11 @@ proc rand_int { min max } {
 	return [expr {int(rand()*($max-$min+1) + $min)}]
 }
 
-if {0 == [string compare $mode "uplink"]} {
-	set command "$sw_(0) poll"
-} else {
+if {0 == [string compare $mode "downlink"]} {
 	set command "$sw_(0) send"
-}
-
+} else {
+	set command "$sw_(0) poll"
+} 
 for {set k 0} {$k < $num_runs} {incr k} {
 	if [expr $k > 0] {
 		for {set i 1} {$i < $val(nn)} {incr i} {
