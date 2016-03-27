@@ -159,6 +159,8 @@ set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
 set datfname [format "swifi_%s_%s.dat" $func $mode]
 set datf [open $datfname w]
+set logqname [format "swifi_%s_%s_queue.log" $func $mode]
+set logq [open $logqname w]
 if {0 == [string compare $func "delay"]} {
 	set delayfname [format "swifi_%s_%s_%d.dat" $func $mode $retry]
 	set delayf [open $delayfname w]
@@ -186,6 +188,11 @@ Agent/SWiFi instproc stat {n_run} {
 	puts $datf "$distance($n_run) $reliability($n_run)"
 	flush $datf
 	set n_rx 0
+}
+Agent/SWiFi instproc qlog { queue_length } {
+	global logq
+	puts $logq "current queue length = $queue_length"
+	flush $logq
 }
 
 set dRNG [new RNG]
@@ -262,11 +269,20 @@ if {0 == [string compare $func "reliability"]} {
 }
 set num_trans  10000
 if {0 != [string compare $func "delay"]} {
-	set interval 0.01
+	set slot 0.01
 } else {
 	# RTT is acquired from measurements in Problem 1&2.
 	set rtt 0.001625
-	set interval [expr 2 * $rtt]
+	set slot [expr 2 * $rtt]
+}
+# specify the number of slots in an interval
+set interval 10
+set rand_min 1
+set rand_max 21
+
+
+proc rand_int { min max } {
+	return [expr {int(rand()*($max-$min+1) + $min)}]
 }
 
 if {0 == [string compare $mode "uplink"]} {
@@ -286,7 +302,13 @@ for {set k 0} {$k < $num_runs} {incr k} {
 		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart"
 	}
 	for {set i 0} {$i < $num_trans} {incr i} {
-		$ns_ at [expr $period * ($k + 1) + $i * $interval] "$command"
+		$ns_ at [expr $period * ($k + 1) + $i * $slot] "$command"
+		if { $i % $interval == 0} {
+			for {set j 1} {$j < $val(nn)} {incr j} {
+				set rand_val [rand_int $rand_min $rand_max]
+				$ns_ at [expr $period * ($k + 1) + $i * $slot - 0.0001] "$sw_($j) pour $rand_val"
+			}
+		}
 	}
 	$ns_ at [expr $period*($k + 2) - 0.003] "$sw_(0) stat $k"
 }
@@ -316,6 +338,7 @@ proc stop {} {
 	close $tracefd
 	close $logf
 }
+
 
 puts "Starting simulation..."
 $ns_ run
