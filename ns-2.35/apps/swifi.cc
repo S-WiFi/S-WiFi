@@ -96,65 +96,6 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	}
 }	
 
-   
-// Schedule uplink packet transmission with the Max Weight policy
-SWiFiAgent::scheduleMaxWeight()
-{
-	int c=1 ;//potential service at queue
-	double Qmax_;//the max Queue
-
-	for(unsigned int n = 0; n<num_client_;n++){
-		//assume channel reliability pn_=1
-		//a is arrival rate
-		Q_[n] = pn_[pn_.size()-1]*( Q_[n]-min(pn_[pn_.size()-1]*c,Q_[n]) + a );//queue of client n
-		cout << "Q_[" << n << "]" << ": ";//print every client's queue 
-		cout<<Q_[n]<<endl;
-	}
-
-	Qmax_=Q_[0];//start with max=first
-	target_client_=0;
-	for(unsigned int j=1;j<num_client_;j++){
-		if(Q_[j]>Qmax_){
-			Qmax_ = Q_[j];  //largest queue 
-			target_client_=j;//scheduling j 
-		}
-	}
-	client_scheduling_.push_back(target_client_);
-
-	for(unsigned int i =0;i<client_scheduling_.size();i++){
-		cout<<"client_scheduling_["<<i<<"]: ";//print client scheduling
-		cout<<client_scheduling_[i]<<endl;
-	}
-
-/*
-    for (unsigned int i = 1;i<T;i++){ //i is time
-       for(unsigned int n = 0; n<num_client_;n++){
-       A_2d[n][i] = ( (double) rand() )/(RAND_MAX);//randomly generate a number between 0 and 1
-  
-       
-       Q_2d[n][i] = Q_2d[n][i-1]-min(pn_*b,Q_2d[n][i-1]) + A_2d[n][i];//queue of client n at time i 
-       cout << "Q_2d[" << n << "][" << i << "]: ";//print every client's queue at time i
-       cout<<Q_2d[n][i]<<endl;
-       }
-       
-       Qmax_[i]=Q_2d[0][i];//start with max=first
-       
-       for(unsigned int j=1;j<num_client_;j++){
-           if(Q_2d[j][i]>Qmax_[i]){
-                 Qmax_[i] = Q_2d[j][i];  //largest queue at time i
-                 client_list_[i] = j;//scheduling j at time i
-           }
-       }
-    }
-    for(unsigned int i =0;i<client_list_.size();i++){
-        cout<<"client_list_["<<i<<"]";//print scheduling client list
-        cout<<client_list_[i]<<endl;
-    }  
-*/  
-}
-
-
-
 SWiFiAgent::~SWiFiAgent()
 { //TODO: Revise...
 	for (unsigned int i = 0; i < client_list_.size(); i++) {
@@ -216,8 +157,14 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			return (TCL_OK);
 		}
 		else if (strcmp(argv[1], "send") == 0) {
+			if (!is_server_) {
+				Tcl& tcl = Tcl::instance();
+				tcl.add_error("Only server AP can send downlink data.");
+				return (TCL_ERROR);
+			}
+			scheduleRoundRobin(true);
 			// Create a new packet
-				Packet* pkt = allocpkt();
+			Packet* pkt = allocpkt();
 			// Access the header for the new packet:
 			hdr_swifi* hdr = hdr_swifi::access(pkt);
 			// Let the 'ret_' field be 0, so the receiving node
@@ -226,13 +173,12 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
-			// IP information  			
+			// Set IP addr
 			hdr_ip *ip = hdr_ip::access(pkt);
+			ip->saddr() = AP_IP;
+			ip->daddr() = target_->addr_;
 			// Broadcasting only. Need to specify ip and ACK address later on.			
 			send(pkt, 0);  
-			
-			
-			
 
 			// return TCL_OK, so the calling function knows that
 			// the command has been processed
@@ -257,8 +203,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				}
 			}
 			if (poll_state_ == SWiFi_POLL_DATA) {
-				//FIXME: scheduleMaxWeight();
-				target_ = client_list_[0];
+				scheduleMaxWeight();
 			}
 			if (!target_) {
 				// No more clients to schedule. Idle.
@@ -568,7 +513,7 @@ void SWiFiAgent::scheduleRoundRobin(bool loop)
 		return;
 	}
 	if (!target_) {
-		target_ = client_list_[0];
+		target_ = client_list_.at(0);
 		return;
 	}
 	if (advance_) {
@@ -577,13 +522,35 @@ void SWiFiAgent::scheduleRoundRobin(bool loop)
 			return;
 		}
 		for (u_int32_t i = 0; i < num_client_; i++) {
-			if (target_ == client_list_[i]) {
-				target_ = client_list_[(i + 1) % num_client_];
+			if (target_ == client_list_.at(i)) {
+				target_ = client_list_.at((i + 1) % num_client_);
 				if (retry_) {
 					advance_ = false;
 				}
 				return;
 			}
+		}
+	}
+}
+
+// Schedule uplink packet transmission with the Max Weight policy
+void SWiFiAgent::scheduleMaxWeight()
+{
+	if (!is_server_ || num_client_ < 1) {
+		target_ = NULL;
+		return;
+	}
+
+	double Wmax; // the max weight (queue length * channel reliability)
+
+	// Start with the first client.
+	// Note vector::at() is safer than operator [] due to bound checking.
+	target_ = client_list_.at(0);
+	Wmax = target_->queue_length_ * target_->pn_;
+	for (unsigned int j = 1; j < num_client_; j++){
+		if (client_list_.at(j)->queue_length_ > Wmax) {
+			target_ = client_list_.at(j);
+			Wmax = target_->queue_length_ * target_->pn_;
 		}
 	}
 }
