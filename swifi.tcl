@@ -35,25 +35,21 @@
 # ======================================================================
 # Handle command line arguments
 # ======================================================================
-if {$argc < 1} {
-	set func "rtt"
-} else {
-	set func [lindex $argv 0]
-}
-if {$argc < 2} {
-	set mode "downlink"
-} else {
-	set mode [lindex $argv 1]
-}
-# Allow abbreviated command line arguments.
-# e.g. `ns swifi.tcl d` is the same as `ns swifi.tcl delay`
 proc usage {} {
 	global argv0
 	puts "$argv0 func mode"
-	puts "    func    One of rtt (default), reliability, and delay"
-	puts "    mode    One of downlink (default), uplink"
+	puts "    func    One of pcf (default), rtt, reliability, and delay"
+	puts "    mode    One of baseline (default) or smart if func is pcf;"
+	puts "            one of downlink (default) or uplink otherwise"
 	exit 0
 }
+if {$argc < 1} {
+	set func "pcf"
+} else {
+	set func [lindex $argv 0]
+}
+# Allow abbreviated command line arguments.
+# e.g. `ns swifi.tcl d` is the same as `ns swifi.tcl delay`
 switch -glob -nocase $func {
 	d* {
 		set func "delay"
@@ -64,9 +60,21 @@ switch -glob -nocase $func {
 	rt* {
 		set func "rtt"
 	}
+	p* {
+		set func "pcf"
+	}
 	default {
 		usage
 	}
+}
+if {$argc < 2} {
+	if {0 == [string compare $func "pcf"]} {
+		set mode "baseline"
+	} else {
+		set mode "downlink"
+	}
+} else {
+	set mode [lindex $argv 1]
 }
 switch -glob -nocase $mode {
 	d* {
@@ -74,6 +82,12 @@ switch -glob -nocase $mode {
 	}
 	u* {
 		set mode "uplink"
+	}
+	b* {
+		set mode "baseline"
+	}
+	s* {
+		set mode "smart"
 	}
 	default {
 		usage
@@ -89,6 +103,10 @@ if {0 == [string compare $func "delay"]} {
 } else {
 	set retry 0
 }
+if {[expr 0 == [string compare $func "pcf"] && 0 == [string compare $mode "smart"]]} {
+	puts stderr "Unimplemented!"
+	exit 1
+}
 
 # ======================================================================
 # Define options
@@ -102,7 +120,11 @@ set val(ifq)            Queue/DropTail/PriQueue    ;# interface queue type
 set val(ll)             LL                         ;# link layer type
 set val(ant)            Antenna/OmniAntenna        ;# antenna model
 set val(ifqlen)         50                         ;# max packet in ifq
-set val(nn)             2                          ;# number of mobilenodes
+if {0 == [string compare $func "pcf"]} {
+	set val(nn)             3                  ;# number of mobilenodes
+} else {
+	set val(nn)             2                  ;# number of mobilenodes
+}
 set val(rp)             DumbAgent                  ;# routing protocol
 
 
@@ -154,6 +176,9 @@ Mac/802_11 set TxFeedback_ 0;
 
 Agent/SWiFi set packet_size_ 1000
 #Agent/SWiFi set slot_interval_ 0.01
+if {0 == [string compare $mode "smart"]} {
+	Agent/SWiFi set pcf_policy_ 1
+}
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
@@ -191,7 +216,8 @@ Agent/SWiFi instproc stat {n_run} {
 }
 Agent/SWiFi instproc qlog { queue_length } {
 	global logq
-	puts $logq "current queue length = $queue_length"
+	$self instvar node_
+	puts $logq "Node [$node_ id] current queue length = $queue_length"
 	flush $logq
 }
 
@@ -257,8 +283,10 @@ $ns_ at 0.0 "$sw_(0) mac $mymac"
 $ns_ at 0.5 "$sw_(0) server"
 #$mymac setTxFeedback 1
 
-$ns_ connect $sw_(1) $sw_(0)
-$ns_ at 3.0 "$sw_(1) register 1 1 0"
+for {set i 1} {$i < $val(nn)} {incr i} {
+	$ns_ connect $sw_($i) $sw_(0)
+	$ns_ at [expr 3.0 + 0.1*$i] "$sw_($i) register 1 1 0"
+}
 
 set period     100.0
 if {0 == [string compare $func "reliability"]} {
@@ -285,7 +313,7 @@ proc rand_int { min max } {
 	return [expr {int(rand()*($max-$min+1) + $min)}]
 }
 
-if {0 == [string compare $mode "uplink"]} {
+if {0 != [string compare $mode "downlink"]} {
 	set command "$sw_(0) poll"
 } else {
 	set command "$sw_(0) send"
@@ -304,6 +332,8 @@ for {set k 0} {$k < $num_runs} {incr k} {
 	for {set i 0} {$i < $num_trans} {incr i} {
 		$ns_ at [expr $period * ($k + 1) + $i * $slot] "$command"
 		if { $i % $interval == 0} {
+			# boi = beginning of interval
+			$ns_ at [expr $period * ($k + 1) + $i * $slot - 0.0002] "$sw_(0) boi"
 			for {set j 1} {$j < $val(nn)} {incr j} {
 				set rand_val [rand_int $rand_min $rand_max]
 				$ns_ at [expr $period * ($k + 1) + $i * $slot - 0.0001] "$sw_($j) pour $rand_val"

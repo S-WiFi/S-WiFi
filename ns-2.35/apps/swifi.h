@@ -22,10 +22,24 @@ using std::vector;
 using std::endl;
 using std::ofstream;
 
+#define AP_IP 0 // It has to be 0 for ARP to find the AP correctly.
+
 enum swifi_pkt_t {
-	SWiFi_PKT_POLL = 10,
+	SWiFi_PKT_POLL_NUM  = 9,  // poll number of packets in uplink
+	SWiFi_PKT_POLL_DATA = 10, // poll data packet transmission in uplink
+	SWiFi_PKT_NUM_UL,  // packet in uplink that carrys num of pkts at client
+	SWiFi_PKT_DATA_UL, // data packet in uplink (client to server)
 };
 
+enum swifi_poll_state {
+	SWiFi_POLL_NONE,
+	SWiFi_POLL_NUM,
+	SWiFi_POLL_DATA,
+	SWiFi_POLL_IDLE,
+};
+
+#define	SWiFi_PCF_BASELINE 0
+#define	SWiFi_PCF_SMART    1
 
 struct hdr_swifi {
 	char ret_;
@@ -45,6 +59,10 @@ struct hdr_swifi {
 	int tier_;    // user priority, not in use for now
 	int init_;    // initial data in packets in the wireless node
 	double pn_;   // channel reliability, not in use for now	
+
+	// For polling data packet
+	u_int32_t exp_pkt_id_;
+	u_int32_t queue_length_;
 
 	// Header access methods
 	static int offset_; 	// required by PacketHeaderManager
@@ -66,6 +84,8 @@ public:
 	int tier_;	     // tier of this client
 	double pn_;      // channel reliability
 	bool is_active_; // indicate whether the client is active or not
+	u_int32_t exp_pkt_id_;   // Expected packet index.
+	u_int32_t queue_length_; // Remaining queue length of client
 };
 
 class SWiFiAgent : public Agent {
@@ -75,7 +95,7 @@ public:
 	~SWiFiAgent();
 
  	int seq_;	       // a send sequence number like in real ping
-	int num_client_;  // number of total clients
+	u_int32_t num_client_;  // number of total clients
 	vector<SWiFiClient*> client_list_;  // For a server to handle scheduling among clients
 	bool is_server_;   // Indicate whether the agent is a server or not
 
@@ -90,7 +110,15 @@ protected:
 	Mac* mac_;             // MAC
 	SWiFiClient* target_;  // Only for server: showing the current target client 
 	ofstream tracefile_;   // For outputting user-defined trace file
-	int queue_length_;     // Number of packets in the queue of a client
+	u_int32_t queue_length_;     // Number of packets in the queue of a client
+	swifi_poll_state poll_state_; // Indicate the state of polling (used by server AP)
+	int do_poll_num_;      // Whether to send POLL_NUM before POLL_DATA
+
+	int pcf_policy_; // PCF policy: baseline/smart
+	// Whether to retry the same client if no response (user configurable)
+	int retry_;
+	bool advance_;  // Whether to advance to the next client in scheduling
+	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
 
 };
 
