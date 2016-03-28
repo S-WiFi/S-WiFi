@@ -44,7 +44,7 @@ struct hdr_swifi {
  	double qn_;   // user demand in packets
 	int tier_;    // user priority, not in use for now
 	int init_;    // initial data in packets in the wireless node
-	double pn_;   // channel reliability, not in use for now	
+	double pn_;   // channel reliability	
 
 	// Header access methods
 	static int offset_; 	// required by PacketHeaderManager
@@ -66,6 +66,8 @@ public:
 	int tier_;	     // tier of this client
 	double pn_;      // channel reliability
 	bool is_active_; // indicate whether the client is active or not
+	u_int32_t exp_pkt_id_;   // Expected packet index.
+	u_int32_t queue_length_; // Remaining queue length of client 
 };
 
 class SWiFiAgent : public Agent {

@@ -112,7 +112,7 @@ void SWiFiAgent::Reset()
 // 4. sw_(0) report
 // 5. sw_(0) update_delivered/update_failed
 // 6. sw_(0) mac $mymac
-// 7. sw_(0) register $qn $init $tier
+// 7. sw_(0) register $pn $qn $init $tier
 // 8. sw_(0) poll
 // ************************************************
 
@@ -215,9 +215,12 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			Packet* pkt = allocpkt();
 			hdr_swifi* hdr = hdr_swifi::access(pkt);     
 			hdr->ret_ = 0;		// a packet to register on the server
-			hdr->qn_ = atoi(argv[2]);
-			hdr->tier_ = atoi(argv[3]);
+			hdr->pn_ = atof(argv[2]);
+			hdr->qn_ = atof(argv[3]);
 			hdr->init_ = atoi(argv[4]);
+			hdr->tier_ = atoi(argv[5]);
+			// Set initial queue length of a client
+			queue_length_ = atoi(argv[4]);
 			// Set packet size = 0
 			HDR_CMN(pkt)->size() = 0;
 			send(pkt, 0);     
@@ -247,8 +250,10 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			client_list_[num_client_]->addr_ = (u_int32_t)hdrip->saddr();
 			client_list_[num_client_]->tier_ = hdr->tier_;
 			client_list_[num_client_]->qn_ = hdr->qn_;
-			client_list_[num_client_]->pn_ = 0; // Not in use for now. 
+			client_list_[num_client_]->pn_ = hdr->pn_; // Now in use. 
 			client_list_[num_client_]->is_active_ = true;
+			client_list_[num_client_]->queue_length_ = hdr->init_; // Initial queue length
+			client_list_[num_client_]->exp_pkt_id_ = 1; // start from the HoL packet
 			num_client_++;
 		} 
 		Packet::free(pkt);
