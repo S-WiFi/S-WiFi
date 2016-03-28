@@ -272,7 +272,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			return (TCL_OK);
 		}
 	}
-	else if (argc == 5) {
+	else if (argc == 6) {
 		if (strcmp(argv[1], "register") == 0) {
 			//TODO: Broadcasting a packet for link registration
 			Packet* pkt = allocpkt();
