@@ -95,7 +95,8 @@ switch -glob -nocase $mode {
 }
 if {0 == [string compare $func "pcf"]} {
 	if {0 == [string compare $mode "baseline"] || 0 == [string compare $mode "smart"]} {
-		set retry 1
+		# Disable retry in MAC layer.
+		set retry 0
 	} else {
 		usage
 	}
@@ -331,9 +332,7 @@ if {0 != [string compare $mode "downlink"]} {
 	set command "$sw_(0) poll"
 } else {
 	set command "$sw_(0) send"
-} else {
-	set command "$sw_(0) poll"
-} 
+}
 for {set k 0} {$k < $num_runs} {incr k} {
 	if [expr $k > 0] {
 		for {set i 1} {$i < $val(nn)} {incr i} {
