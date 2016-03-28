@@ -1593,3 +1593,7 @@ Agent/MDART set etxMetric_ true
 
 Agent/SWiFi set packet_size_ 160
 Agent/SWiFi set slot_interval_ 0.01
+Agent/SWiFi set do_poll_num_ true
+# Default PCF policy: baseline (0)
+Agent/SWiFi set pcf_policy_ 0
+Agent/SWiFi set retry_ true
