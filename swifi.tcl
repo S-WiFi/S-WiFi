@@ -93,20 +93,34 @@ switch -glob -nocase $mode {
 		usage
 	}
 }
-puts "func: $func, mode: $mode"
-if {0 == [string compare $func "delay"]} {
-	if {$argc < 3} {
+if {0 == [string compare $func "pcf"]} {
+	if {0 == [string compare $mode "baseline"] || 0 == [string compare $mode "smart"]} {
 		set retry 1
 	} else {
-		set retry [lindex $argv 2]
+		usage
 	}
-} else {
-	set retry 0
+} else  {
+	  if {0 == [string compare $mode "uplink"] || 0 == [string compare $mode "downlink"]} {
+		if {0 == [string compare $func "delay"]} {
+			if {$argc < 3} {
+				set retry 1
+			} else {
+				set retry [lindex $argv 2]
+			}
+		}
+		else {
+			set retry 1
+	  	}
+	  } else {
+ 		usage
+	  }
 }
 if {[expr 0 == [string compare $func "pcf"] && 0 == [string compare $mode "smart"]]} {
 	puts stderr "Unimplemented!"
 	exit 1
 }
+
+puts "func: $func, mode: $mode"
 
 # ======================================================================
 # Define options
@@ -317,8 +331,9 @@ if {0 != [string compare $mode "downlink"]} {
 	set command "$sw_(0) poll"
 } else {
 	set command "$sw_(0) send"
-}
-
+} else {
+	set command "$sw_(0) poll"
+} 
 for {set k 0} {$k < $num_runs} {incr k} {
 	if [expr $k > 0] {
 		for {set i 1} {$i < $val(nn)} {incr i} {
