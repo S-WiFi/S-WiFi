@@ -194,6 +194,7 @@ Agent/SWiFi set packet_size_ 1000
 if {0 == [string compare $mode "smart"]} {
 	Agent/SWiFi set pcf_policy_ 1
 }
+Agent/SWiFi set realtime_ true
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
@@ -223,9 +224,13 @@ Agent/SWiFi instproc recv {from rtt data} {
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
-	global n_rx num_trans distance reliability datf interval
+	global n_rx num_trans distance reliability datf interval func
 	set reliability($n_run) [expr double($n_rx) * $interval / $num_trans]
-	puts $datf "$distance($n_run) $reliability($n_run)"
+	if {0 == [string compare $func "pcf"]} {
+		puts $datf "$reliability($n_run)"
+	} else {
+		puts $datf "$distance($n_run) $reliability($n_run)"
+	}
 	flush $datf
 	set n_rx 0
 }

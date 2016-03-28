@@ -123,6 +123,7 @@ protected:
 	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
 	// Schedule uplink data packet transmission with Max Weight policy
 	void scheduleMaxWeight();
+	int realtime_;  // Whether the traffic is realtime
 };
 
 #endif //  NS_SWIFI_H

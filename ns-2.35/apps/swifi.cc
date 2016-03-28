@@ -94,6 +94,7 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	} else {
 		advance_ = true;
 	}
+	bind_bool("realtime_", &realtime_);
 }	
 
 SWiFiAgent::~SWiFiAgent()
@@ -261,7 +262,11 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		}
 		if (strcmp(argv[1], "pour") == 0){
 			if (atoi(argv[2]) >= 0) {
-				queue_length_ += atoi(argv[2]);
+				if (realtime_) {
+					queue_length_ = atoi(argv[2]);
+				} else {
+					queue_length_ += atoi(argv[2]);
+				}
 				// printf("current queue length = %d \n", queue_length_);
 				Tcl& tcl = Tcl::instance();
 				tcl.evalf("%s qlog %d", name(), queue_length_);			
