@@ -553,4 +553,7 @@ void SWiFiAgent::scheduleMaxWeight()
 			Wmax = target_->queue_length_ * target_->pn_;
 		}
 	}
+	if (Wmax == 0) {
+		target_ = NULL;
+	}
 }
