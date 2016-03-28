@@ -94,7 +94,67 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	} else {
 		advance_ = true;
 	}
+}	
+
+   
+//Schedule Max Weight policy
+SWiFiAgent::Schedule_Max_Weight()	  
+{
+       int c=1 ;//potential service at queue
+       double Qmax_;//the max Queue
+       
+       for(unsigned int n = 0; n<num_client_;n++){
+       //assume channel reliability pn_=1
+       //a is arrival rate
+       Q_[n] = pn_[pn_.size()-1]*( Q_[n]-min(pn_[pn_.size()-1]*c,Q_[n]) + a );//queue of client n
+       cout << "Q_[" << n << "]" << ": ";//print every client's queue 
+       cout<<Q_[n]<<endl;
+       }
+       
+       Qmax_=Q_[0];//start with max=first
+       target_client_=0;
+       for(unsigned int j=1;j<num_client_;j++){
+           if(Q_[j]>Qmax_){
+                 Qmax_ = Q_[j];  //largest queue 
+                 target_client_=j;//scheduling j 
+           }
+       }
+       client_scheduling_.push_back(target_client_);
+       
+       for(unsigned int i =0;i<client_scheduling_.size();i++){
+        cout<<"client_scheduling_["<<i<<"]: ";//print client scheduling
+        cout<<client_scheduling_[i]<<endl;
+       }  
+       
+
+/*
+    for (unsigned int i = 1;i<T;i++){ //i is time
+       for(unsigned int n = 0; n<num_client_;n++){
+       A_2d[n][i] = ( (double) rand() )/(RAND_MAX);//randomly generate a number between 0 and 1
+  
+       
+       Q_2d[n][i] = Q_2d[n][i-1]-min(pn_*b,Q_2d[n][i-1]) + A_2d[n][i];//queue of client n at time i 
+       cout << "Q_2d[" << n << "][" << i << "]: ";//print every client's queue at time i
+       cout<<Q_2d[n][i]<<endl;
+       }
+       
+       Qmax_[i]=Q_2d[0][i];//start with max=first
+       
+       for(unsigned int j=1;j<num_client_;j++){
+           if(Q_2d[j][i]>Qmax_[i]){
+                 Qmax_[i] = Q_2d[j][i];  //largest queue at time i
+                 client_list_[i] = j;//scheduling j at time i
+           }
+       }
+    }
+    for(unsigned int i =0;i<client_list_.size();i++){
+        cout<<"client_list_["<<i<<"]";//print scheduling client list
+        cout<<client_list_[i]<<endl;
+    }  
+*/  
 }
+
+
 
 SWiFiAgent::~SWiFiAgent()
 { //TODO: Revise...
