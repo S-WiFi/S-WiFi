@@ -140,7 +140,8 @@ protected:
 	int retry_;
 	bool advance_;  // Whether to advance to the next client in scheduling
 	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
-
+	// Schedule uplink data packet transmission with Max Weight policy
+	void scheduleMaxWeight();
 };
 
 #endif //  NS_SWIFI_H
