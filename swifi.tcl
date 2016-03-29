@@ -202,6 +202,8 @@ set datfname [format "swifi_%s_%s.dat" $func $mode]
 set datf [open $datfname w]
 set logqname [format "swifi_%s_%s_queue.log" $func $mode]
 set logq [open $logqname w]
+set loganame [format "swifi_%s_%s_arrival.log" $func $mode]
+set loga [open $loganame w]
 if {0 == [string compare $func "delay"]} {
 	set delayfname [format "swifi_%s_%s_%d.dat" $func $mode $retry]
 	set delayf [open $delayfname w]
@@ -234,10 +236,15 @@ Agent/SWiFi instproc stat {n_run} {
 	flush $datf
 	set n_rx 0
 }
-Agent/SWiFi instproc qlog { num } {
-	global logq
+Agent/SWiFi instproc alog { num } {
+	global loga
 	$self instvar node_
-	puts $logq "Node [$node_ id] current number of data packets = $num"
+	puts $loga "Node [$node_ id] current number of data packets = $num"
+	flush $loga
+}
+proc qlog { node qlen } {
+	global logq
+	puts $logq "Node $node current queue length = $qlen"
 	flush $logq
 }
 

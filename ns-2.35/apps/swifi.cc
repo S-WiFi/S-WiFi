@@ -276,7 +276,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				}
 				// printf("current number of data packets = %d \n", num_data_pkt_);
 				Tcl& tcl = Tcl::instance();
-				tcl.evalf("%s qlog %d", name(), num_data_pkt_);
+				tcl.evalf("%s alog %d", name(), num_data_pkt_);
 			}
 			else {
 				printf("arrivals should be nonnegative!\n");
@@ -535,6 +535,8 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			if (target_->exp_pkt_id_ == 0 && target_->queue_length_ > 0) {
 				target_->exp_pkt_id_ = 1;
 			}
+			Tcl& tcl = Tcl::instance();
+			tcl.evalf("qlog %d %d", target_->addr_, target_->queue_length_);
 		}
 		Packet::free(pkt);
 		return;
