@@ -66,9 +66,10 @@ struct hdr_swifi {
 	int init_;    // initial data in packets in the wireless node
 	double pn_;   // channel reliability	
 
+	// For polling num packet
+	u_int32_t num_data_pkt_;
 	// For polling data packet
 	u_int32_t exp_pkt_id_;
-	u_int32_t queue_length_;
 
 	// Header access methods
 	static int offset_; 	// required by PacketHeaderManager
@@ -91,6 +92,7 @@ public:
 	double pn_;      // channel reliability
 	bool is_active_; // indicate whether the client is active or not
 	u_int32_t exp_pkt_id_;   // Expected packet index.
+	u_int32_t num_data_pkt_; // Number of data packets received of client
 	u_int32_t queue_length_; // Remaining queue length of client
 };
 
@@ -116,7 +118,12 @@ protected:
 	Mac* mac_;             // MAC
 	SWiFiClient* target_;  // Only for server: showing the current target client 
 	ofstream tracefile_;   // For outputting user-defined trace file
-	u_int32_t queue_length_;     // Number of packets in the queue of a client
+	// Number of data packets generated at the client.
+	// Under PCF, it is only meaningful for clients.
+	// The server AP tracks this info per client in client_list_.
+	// Note that for realtime traffic, it is reset per interval.
+	// For non-realtime traffic, it is accumulated all the time in each run.
+	u_int32_t num_data_pkt_;
 	swifi_poll_state poll_state_; // Indicate the state of polling (used by server AP)
 	int do_poll_num_;      // Whether to send POLL_NUM before POLL_DATA
 

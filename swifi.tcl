@@ -234,10 +234,10 @@ Agent/SWiFi instproc stat {n_run} {
 	flush $datf
 	set n_rx 0
 }
-Agent/SWiFi instproc qlog { queue_length } {
+Agent/SWiFi instproc qlog { num } {
 	global logq
 	$self instvar node_
-	puts $logq "Node [$node_ id] current queue length = $queue_length"
+	puts $logq "Node [$node_ id] current number of data packets = $num"
 	flush $logq
 }
 
@@ -317,7 +317,7 @@ $ns_ at 0.5 "$sw_(0) server"
 
 for {set i 1} {$i < $val(nn)} {incr i} {
 	$ns_ connect $sw_($i) $sw_(0)
-	set cmd "$sw_($i) register $lut($distance($i)) 1 1 0"
+	set cmd "$sw_($i) register $lut($distance($i)) 0 0 0"
 	#puts "register cmd: $cmd"
 	$ns_ at [expr 3.0 + 0.1*$i] $cmd
 }

@@ -82,7 +82,7 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	client_list_ = vector<SWiFiClient*>();
 	is_server_ = 0;
 	target_ = NULL;
-	queue_length_ = 0;
+	num_data_pkt_ = 0;
 	poll_state_ = SWiFi_POLL_NONE;
 	bind("packet_size_", &size_);
 	bind("slot_interval_", &slot_interval_);
@@ -95,7 +95,7 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 		advance_ = true;
 	}
 	bind_bool("realtime_", &realtime_);
-}	
+}
 
 SWiFiAgent::~SWiFiAgent()
 { //TODO: Revise...
@@ -222,6 +222,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				hdr->ret_ = SWiFi_PKT_POLL_DATA; // It's a POLL_DATA packet
 			} else {
 				fprintf(stderr, "You have walked into the void.\n");
+				exit(1);
 			}
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
@@ -247,6 +248,12 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				} else {
 					poll_state_ = SWiFi_POLL_DATA;
 				}
+				if (realtime_) {
+					for (unsigned i = 0; i < num_client_; i++) {
+						client_list_.at(i)->num_data_pkt_ = 0;
+						client_list_.at(i)->exp_pkt_id_ = 0;
+					}
+				}
 			}
 			return (TCL_OK);
 		}
@@ -263,13 +270,13 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		if (strcmp(argv[1], "pour") == 0){
 			if (atoi(argv[2]) >= 0) {
 				if (realtime_) {
-					queue_length_ = atoi(argv[2]);
+					num_data_pkt_ = atoi(argv[2]);
 				} else {
-					queue_length_ += atoi(argv[2]);
+					num_data_pkt_ += atoi(argv[2]);
 				}
-				// printf("current queue length = %d \n", queue_length_);
+				// printf("current number of data packets = %d \n", num_data_pkt_);
 				Tcl& tcl = Tcl::instance();
-				tcl.evalf("%s qlog %d", name(), queue_length_);			
+				tcl.evalf("%s qlog %d", name(), num_data_pkt_);
 			}
 			else {
 				printf("arrivals should be nonnegative!\n");
@@ -287,8 +294,8 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->qn_ = atof(argv[3]);
 			hdr->init_ = atoi(argv[4]);
 			hdr->tier_ = atoi(argv[5]);
-			// Set initial queue length of a client
-			queue_length_ = atoi(argv[4]);
+			// Set initial number of data packets of a client
+			num_data_pkt_ = atoi(argv[4]);
 			// Set packet size = 0
 			HDR_CMN(pkt)->size() = 0;
 			send(pkt, 0);     
@@ -321,6 +328,9 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			client_list_[num_client_]->pn_ = hdr->pn_; // Now in use. 
 			client_list_[num_client_]->is_active_ = true;
 			client_list_[num_client_]->exp_pkt_id_ = 0;
+			// Note here num_data_pkt_ only counts those received.
+			client_list_[num_client_]->num_data_pkt_ = 0;
+			client_list_[num_client_]->queue_length_ = hdr->init_;
 			//fprintf(stderr, "Registered: client %d, ip %d\n", num_client_, client_list_[num_client_]->addr_);
 			num_client_++;
 		} 
@@ -335,6 +345,9 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			//fprintf(stderr, "Received uplink data packet: src addr=%d, dest addr=%d\n", hdrip->saddr(), hdrip->daddr());
 			target_->queue_length_--;
 			target_->exp_pkt_id_++;
+			target_->num_data_pkt_++;
+			//fprintf(stderr, "addr=%d, queue_length_=%d, exp_pkt_id_=%d, num_data_pkt_=%d\n",
+					//hdrip->saddr(), target_->queue_length_, target_->exp_pkt_id_, target_->num_data_pkt_);
 			PacketData* data = (PacketData*)pkt->userdata();
 			// Use tcl.eval to call the Tcl
 			// interpreter with the poll results.
@@ -426,49 +439,48 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 		// Send a data packet from the client to the server.
 		if (!is_server_) {
 			//fprintf(stderr, "Received POLL_DATA: src addr=%d, dst addr=%d\n", hdrip->saddr(), hdrip->daddr());
-			if (queue_length_ > 0){
-				// Note copy assignments are necessary unless free(pkt) is delayed.
-				// First save the old packet's send_time
-				double stime = hdr->send_time_;
-				int rcv_seq = hdr->seq_;
-				u_int32_t pkt_id = hdr->exp_pkt_id_;
-				nsaddr_t ret_saddr = hdrip->daddr();
-				nsaddr_t ret_daddr = hdrip->saddr();
-				// Discard the packet
-				Packet::free(pkt);
-				// Create a new packet
-				Packet* pktret = allocpkt();
-				// Access the packet header for the new packet:
-				hdr_swifi* hdrret = hdr_swifi::access(pktret);
-				// Set ret to 2 (data packet from client to server)
-				hdrret->ret_ = 2;
-				// Set the send_time field to the correct value
-				hdrret->send_time_ = stime;
-				// Added by Andrei Gurtov for one-way delay measurement.
-				hdrret->rcv_time_ = Scheduler::instance().clock();
-				hdrret->seq_ = rcv_seq;
-				// Set destination IP addr
-				hdr_ip* hdrret_ip = HDR_IP(pktret);
-				hdrret_ip->saddr() = ret_saddr;
-				hdrret_ip->daddr() = ret_daddr;
-				// Fill in the data payload
-				u_int32_t node_id = ret_saddr >> Address::instance().NodeShift_[1];
-				ostringstream ss;
-				ss << "Here is node " << node_id << "'s pkt no. " << pkt_id << "!";
-
-				// Use reference to potentially extend its lifetime
-				// and avoid its c_str becomes invalid.
-				// cf. http://stackoverflow.com/a/1374485/1166587
-				const string& str = ss.str();
-				PacketData *data = new PacketData(1 + str.size());
-				strcpy((char*)data->data(), str.c_str());
-				pktret->setdata(data);
-				// Update queue length
-				queue_length_--;
-				// Send the packet
-				send(pktret, 0);
-				//fprintf(stderr, "Sent data: src addr=%d, dst addr=%d\n", hdrret_ip->saddr(), hdrret_ip->daddr());
+			// Note copy assignments are necessary unless free(pkt) is delayed.
+			// First save the old packet's send_time
+			double stime = hdr->send_time_;
+			int rcv_seq = hdr->seq_;
+			u_int32_t pkt_id = hdr->exp_pkt_id_;
+			nsaddr_t ret_saddr = hdrip->daddr();
+			nsaddr_t ret_daddr = hdrip->saddr();
+			// Discard the packet
+			Packet::free(pkt);
+			if (pkt_id > num_data_pkt_) {
+				fprintf(stderr, "Bug: exp_pkt_id_ > num_data_pkt_\n");
+				exit(1);
 			}
+			// Create a new packet
+			Packet* pktret = allocpkt();
+			// Access the packet header for the new packet:
+			hdr_swifi* hdrret = hdr_swifi::access(pktret);
+			// Set ret to 2 (data packet from client to server)
+			hdrret->ret_ = 2;
+			// Set the send_time field to the correct value
+			hdrret->send_time_ = stime;
+			// Added by Andrei Gurtov for one-way delay measurement.
+			hdrret->rcv_time_ = Scheduler::instance().clock();
+			hdrret->seq_ = rcv_seq;
+			// Set destination IP addr
+			hdr_ip* hdrret_ip = HDR_IP(pktret);
+			hdrret_ip->saddr() = ret_saddr;
+			hdrret_ip->daddr() = ret_daddr;
+			// Fill in the data payload
+			u_int32_t node_id = ret_saddr >> Address::instance().NodeShift_[1];
+			ostringstream ss;
+			ss << "Here is node " << node_id << "'s pkt no. " << pkt_id << "!";
+			// Use reference to potentially extend its lifetime
+			// and avoid its c_str becomes invalid.
+			// cf. http://stackoverflow.com/a/1374485/1166587
+			const string& str = ss.str();
+			PacketData *data = new PacketData(1 + str.size());
+			strcpy((char*)data->data(), str.c_str());
+			pktret->setdata(data);
+			// Send the packet
+			send(pktret, 0);
+			//fprintf(stderr, "Sent data: src addr=%d, dst addr=%d\n", hdrret_ip->saddr(), hdrret_ip->daddr());
 		}
 	}
 	else if (hdr->ret_ == SWiFi_PKT_POLL_NUM) {
@@ -497,7 +509,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			hdr_ip* hdrret_ip = HDR_IP(pktret);
 			hdrret_ip->saddr() = ret_saddr;
 			hdrret_ip->daddr() = ret_daddr;
-			hdrret->queue_length_ = queue_length_;
+			hdrret->num_data_pkt_ = num_data_pkt_;
 			// Send the packet
 			send(pktret, 0);
 			//fprintf(stderr, "Sent num: src addr=%d, dst addr=%d\n", hdrret_ip->saddr(), hdrret_ip->daddr());
@@ -510,8 +522,17 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			if (retry_) {
 				advance_ = true;
 			}
-			target_->queue_length_ = hdr->queue_length_;
-			if (target_->queue_length_ > 0) {
+			// The current queue length is equal to
+			// the number of data packets generated minus
+			// the number of data packets received so far.
+			// For realtime traffic, num_data_pkt_ should be 0.
+			if (realtime_ && target_->num_data_pkt_ != 0) {
+				fprintf(stderr, "You have found a bug about num_data_pkt_!\n");
+				exit(1);
+			}
+			target_->queue_length_ =
+				hdr->num_data_pkt_ - target_->num_data_pkt_;
+			if (target_->exp_pkt_id_ == 0 && target_->queue_length_ > 0) {
 				target_->exp_pkt_id_ = 1;
 			}
 		}
@@ -561,7 +582,7 @@ void SWiFiAgent::scheduleMaxWeight()
 	target_ = client_list_.at(0);
 	Wmax = target_->queue_length_ * target_->pn_;
 	for (unsigned int j = 1; j < num_client_; j++){
-		if (client_list_.at(j)->queue_length_ > Wmax) {
+		if (client_list_.at(j)->queue_length_ * client_list_.at(j)->pn_ > Wmax) {
 			target_ = client_list_.at(j);
 			Wmax = target_->queue_length_ * target_->pn_;
 		}
