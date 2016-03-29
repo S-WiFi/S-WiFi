@@ -105,11 +105,32 @@ SWiFiAgent::~SWiFiAgent()
 	client_list_.clear();
 }
 
-void SWiFiAgent::Reset()
+void SWiFiAgent::restart()
 {
-	// Reset client list.
-	for (unsigned int i = 0; i < client_list_.size(); i++) {
-		delete client_list_[i];
+	if (is_server_) {
+		for (unsigned int i = 0; i < num_client_; i++) {
+			client_list_.at(i)->exp_pkt_id_ = 0;
+			client_list_.at(i)->num_data_pkt_ = 0;
+			client_list_.at(i)->queue_length_ = client_list_.at(i)->init_;
+		}
+		poll_state_ = SWiFi_POLL_NONE;
+		if (retry_) {
+			advance_ = false;
+		} else {
+			advance_ = true;
+		}
+	} else {
+		num_data_pkt_ = 0;
+	}
+}
+
+void SWiFiAgent::reset()
+{
+	if (!is_server_) {
+		return;
+	}
+	for (unsigned int i = 0; i < num_client_; i++) {
+		delete client_list_.at(i);
 	}
 	client_list_.clear();
 	num_client_ = 0;
@@ -146,7 +167,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			return (TCL_OK);
 		}
 		else if (strcmp (argv[1], "restart") == 0){ //TODO: restart the simulation
-			Reset();
+			restart();
 			return (TCL_OK);
 		}
 		else if (strcmp(argv[1], "report") == 0) { //TODO: Print data into a txt file
@@ -319,7 +340,6 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	//this packet is to register  
 	if (hdr->ret_ == 0){ 
 		if(is_server_ == true){  //only server needs to deal with registration
-			//TODO: 
 			SWiFiClient* client = new SWiFiClient;
 			client_list_.push_back(client);
 			client_list_[num_client_]->addr_ = (u_int32_t)hdrip->saddr();
@@ -330,6 +350,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			client_list_[num_client_]->exp_pkt_id_ = 0;
 			// Note here num_data_pkt_ only counts those received.
 			client_list_[num_client_]->num_data_pkt_ = 0;
+			client_list_[num_client_]->init_ = hdr->init_;
 			client_list_[num_client_]->queue_length_ = hdr->init_;
 			//fprintf(stderr, "Registered: client %d, ip %d\n", num_client_, client_list_[num_client_]->addr_);
 			num_client_++;

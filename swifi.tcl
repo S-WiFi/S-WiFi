@@ -333,6 +333,8 @@ set period     100.0
 if {0 == [string compare $func "reliability"]} {
 	set num_runs   21
 	set delta_dist 100
+} elseif {0 == [string compare $func "pcf"]} {
+	set num_runs   10
 } else {
 	set num_runs   1
 }
@@ -360,14 +362,17 @@ if {0 != [string compare $mode "downlink"]} {
 	set command "$sw_(0) send"
 }
 for {set k 0} {$k < $num_runs} {incr k} {
-	if [expr $k > 0] {
+	if {0 == [string compare $func "reliability"] && [expr $k > 0]} {
 		for {set i 1} {$i < $val(nn)} {incr i} {
 			set distance($k) [expr $delta_dist * $k]
 			$ns_ at [expr $period*($k + 1) - 0.002] \
 				"$node_($i) set X_ [expr 3.0 + $distance($k)]"
 		}
-
-		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart"
+	}
+	if {[expr $k > 0]} {
+		for {set i 0} {$i < $val(nn)} {incr i} {
+			$ns_ at [expr $period*($k + 1) - 0.001] "$sw_($i) restart"
+		}
 	}
 	for {set i 0} {$i < $num_trans} {incr i} {
 		$ns_ at [expr $period * ($k + 1) + $i * $slot] "$command"

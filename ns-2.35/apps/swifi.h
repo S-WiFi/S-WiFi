@@ -61,10 +61,10 @@ struct hdr_swifi {
  	int seq_;		    // sequence number
 
  	//For register packet
+	double pn_;   // channel reliability
  	double qn_;   // user demand in packets
-	int tier_;    // user priority, not in use for now
 	int init_;    // initial data in packets in the wireless node
-	double pn_;   // channel reliability	
+	int tier_;    // user priority, not in use for now
 
 	// For polling num packet
 	u_int32_t num_data_pkt_;
@@ -87,9 +87,10 @@ public:
 	bool is_active() {return is_active_;}
 
 	u_int32_t addr_; // address
-	double qn_;	     // throughput requirement
-	int tier_;	     // tier of this client
-	double pn_;      // channel reliability
+	double pn_;   // channel reliability
+	double qn_;   // user demand in packets
+	int init_;    // initial data in packets in the wireless node
+	int tier_;    // user priority, not in use for now
 	bool is_active_; // indicate whether the client is active or not
 	u_int32_t exp_pkt_id_;   // Expected packet index.
 	u_int32_t num_data_pkt_; // Number of data packets received of client
@@ -107,10 +108,11 @@ public:
 	vector<SWiFiClient*> client_list_;  // For a server to handle scheduling among clients
 	bool is_server_;   // Indicate whether the agent is a server or not
 
-	virtual int command(int argc, const char*const* argv); //TODO: blablabla...
-	virtual void recv(Packet*, Handler*); //TODO: blablabla...
+	virtual int command(int argc, const char*const* argv);
+	virtual void recv(Packet*, Handler*);
 
-	void Reset(); //TODO: For server to reset parameters
+	void restart(); // For server to reset counters of registered clients
+	void reset();   // For server to reset (un-register) associated clients
 
 protected:
 	u_int32_t Ackaddr_;    // IP address for incoming ACK packet
@@ -118,23 +120,28 @@ protected:
 	Mac* mac_;             // MAC
 	SWiFiClient* target_;  // Only for server: showing the current target client 
 	ofstream tracefile_;   // For outputting user-defined trace file
+
 	// Number of data packets generated at the client.
 	// Under PCF, it is only meaningful for clients.
 	// The server AP tracks this info per client in client_list_.
 	// Note that for realtime traffic, it is reset per interval.
 	// For non-realtime traffic, it is accumulated all the time in each run.
 	u_int32_t num_data_pkt_;
-	swifi_poll_state poll_state_; // Indicate the state of polling (used by server AP)
-	int do_poll_num_;      // Whether to send POLL_NUM before POLL_DATA
 
+	// Used by server only
+	swifi_poll_state poll_state_; // Indicate the state of polling (used by server AP)
+	bool advance_;  // Whether to advance to the next client in scheduling
+
+	// Scheduling parameters
+	int do_poll_num_;      // Whether to send POLL_NUM before POLL_DATA
 	int pcf_policy_; // PCF policy: baseline/smart
 	// Whether to retry the same client if no response (user configurable)
 	int retry_;
-	bool advance_;  // Whether to advance to the next client in scheduling
+	int realtime_;  // Whether the traffic is realtime
+
 	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
 	// Schedule uplink data packet transmission with Max Weight policy
 	void scheduleMaxWeight();
-	int realtime_;  // Whether the traffic is realtime
 };
 
 #endif //  NS_SWIFI_H
