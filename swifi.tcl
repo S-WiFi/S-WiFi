@@ -194,6 +194,7 @@ Agent/SWiFi set packet_size_ 1000
 if {0 == [string compare $mode "smart"]} {
 	Agent/SWiFi set pcf_policy_ 1
 }
+Agent/SWiFi set realtime_ true
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
@@ -201,6 +202,8 @@ set datfname [format "swifi_%s_%s.dat" $func $mode]
 set datf [open $datfname w]
 set logqname [format "swifi_%s_%s_queue.log" $func $mode]
 set logq [open $logqname w]
+set loganame [format "swifi_%s_%s_arrival.log" $func $mode]
+set loga [open $loganame w]
 if {0 == [string compare $func "delay"]} {
 	set delayfname [format "swifi_%s_%s_%d.dat" $func $mode $retry]
 	set delayf [open $delayfname w]
@@ -223,16 +226,25 @@ Agent/SWiFi instproc recv {from rtt data} {
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
-	global n_rx num_trans distance reliability datf
-	set reliability($n_run) [expr double($n_rx) / $num_trans]
-	puts $datf "$distance($n_run) $reliability($n_run)"
+	global n_rx num_trans distance reliability datf interval func
+	set reliability($n_run) [expr double($n_rx) * $interval / $num_trans]
+	if {0 == [string compare $func "pcf"]} {
+		puts $datf "$reliability($n_run)"
+	} else {
+		puts $datf "$distance($n_run) $reliability($n_run)"
+	}
 	flush $datf
 	set n_rx 0
 }
-Agent/SWiFi instproc qlog { queue_length } {
-	global logq
+Agent/SWiFi instproc alog { num } {
+	global loga
 	$self instvar node_
-	puts $logq "Node [$node_ id] current queue length = $queue_length"
+	puts $loga "Node [$node_ id] current number of data packets = $num"
+	flush $loga
+}
+proc qlog { node qlen } {
+	global logq
+	puts $logq "Node $node current queue length = $qlen"
 	flush $logq
 }
 
@@ -273,16 +285,28 @@ set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
 if {0 != [string compare $func "delay"]} {
+	# FIXME better way to specify distances
 	set distance(0) 1
+	set distance(1) 100
+	set distance(2) 200
 } else {
 	# Set the distance that the reliability is >= 55% per Problem 3.
 	set distance(0) 1000
 }
 
+# Build a LUT of (distance, reliability).
+set lutfp [open "report/swifi_reliability_uplink.dat" r]
+set lutfile [read $lutfp]
+close $lutfp
+set pattern {([\.0-9]+)\s+([\.0-9]+)}
+foreach {fullmatch m1 m2} [regexp -all -line -inline $pattern $lutfile] {
+	set lut($m1) $m2
+}
+
 for {set i 1} {$i < $val(nn) } {incr i} {
 	set node_($i) [$ns_ node]	
 	$node_($i) random-motion 0		;# disable random motion
-	$node_($i) set X_ [expr 3.0 + $i*$distance(0)]
+	$node_($i) set X_ [expr 3.0 + $distance($i)]
 	$node_($i) set Y_ 100
 	$node_($i) set Z_ 0
 	set sw_($i) [new Agent/SWiFi]
@@ -300,7 +324,9 @@ $ns_ at 0.5 "$sw_(0) server"
 
 for {set i 1} {$i < $val(nn)} {incr i} {
 	$ns_ connect $sw_($i) $sw_(0)
-	$ns_ at [expr 3.0 + 0.1*$i] "$sw_($i) register 1 1 0"
+	set cmd "$sw_($i) register $lut($distance($i)) 0 0 0"
+	#puts "register cmd: $cmd"
+	$ns_ at [expr 3.0 + 0.1*$i] $cmd
 }
 
 set period     100.0
@@ -320,8 +346,8 @@ if {0 != [string compare $func "delay"]} {
 }
 # specify the number of slots in an interval
 set interval 10
-set rand_min 1
-set rand_max 21
+set rand_min 0
+set rand_max 2
 
 
 proc rand_int { min max } {
@@ -338,7 +364,7 @@ for {set k 0} {$k < $num_runs} {incr k} {
 		for {set i 1} {$i < $val(nn)} {incr i} {
 			set distance($k) [expr $delta_dist * $k]
 			$ns_ at [expr $period*($k + 1) - 0.002] \
-				"$node_($i) set X_ [expr 3.0 + $i * $distance($k)]"
+				"$node_($i) set X_ [expr 3.0 + $distance($k)]"
 		}
 
 		$ns_ at [expr $period*($k + 1) - 0.001] "$sw_(0) restart"

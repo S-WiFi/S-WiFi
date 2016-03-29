@@ -16,12 +16,16 @@
 #include "address.h"
 #include "ip.h"
 #include "mac.h"
-#include <vector>   
+#include <vector>
 #include <fstream>  // For outputting data
+#include <sstream>
+#include <string>
 #include <algorithm> //for min
 using std::vector;
 using std::endl;
 using std::ofstream;
+using std::ostringstream;
+using std::string;
 using std::min;
 
 #define AP_IP 0 // It has to be 0 for ARP to find the AP correctly.
@@ -62,9 +66,10 @@ struct hdr_swifi {
 	int init_;    // initial data in packets in the wireless node
 	double pn_;   // channel reliability	
 
+	// For polling num packet
+	u_int32_t num_data_pkt_;
 	// For polling data packet
 	u_int32_t exp_pkt_id_;
-	u_int32_t queue_length_;
 
 	// Header access methods
 	static int offset_; 	// required by PacketHeaderManager
@@ -87,6 +92,7 @@ public:
 	double pn_;      // channel reliability
 	bool is_active_; // indicate whether the client is active or not
 	u_int32_t exp_pkt_id_;   // Expected packet index.
+	u_int32_t num_data_pkt_; // Number of data packets received of client
 	u_int32_t queue_length_; // Remaining queue length of client
 };
 
@@ -105,33 +111,19 @@ public:
 	virtual void recv(Packet*, Handler*); //TODO: blablabla...
 
 	void Reset(); //TODO: For server to reset parameters
-	
-	
-	//for maxweight schedule
-private:
-	vector<double> Q_(num_client_);//queue
-	vector<double> pn_(num_client_);//channel reliability
-	int target_client_;//target client
-	vector<int> client_scheduling_;// For a server to handle scheduling among clients  
-	
-	/*
-	vector<double> Q_col(T);
-	vector<vector<double>> Q_2d(num_client_,Q_col);//Queue
-	double pn_=1;//channel reliability
-	int b=1 ;//potential service at queue
-	vector<double> A_col(T);
-	vector<vector<double>> A_2d(num_client_,A_col);//arrival rate
-        vector<double> Qmax_(period);//the max Queue
-        vector<int> client_list_(period);// For a server to handle scheduling among clients
-        */
-        
+
 protected:
 	u_int32_t Ackaddr_;    // IP address for incoming ACK packet
 	double slot_interval_; // time length of a single slot
 	Mac* mac_;             // MAC
 	SWiFiClient* target_;  // Only for server: showing the current target client 
 	ofstream tracefile_;   // For outputting user-defined trace file
-	u_int32_t queue_length_;     // Number of packets in the queue of a client
+	// Number of data packets generated at the client.
+	// Under PCF, it is only meaningful for clients.
+	// The server AP tracks this info per client in client_list_.
+	// Note that for realtime traffic, it is reset per interval.
+	// For non-realtime traffic, it is accumulated all the time in each run.
+	u_int32_t num_data_pkt_;
 	swifi_poll_state poll_state_; // Indicate the state of polling (used by server AP)
 	int do_poll_num_;      // Whether to send POLL_NUM before POLL_DATA
 
@@ -140,7 +132,9 @@ protected:
 	int retry_;
 	bool advance_;  // Whether to advance to the next client in scheduling
 	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
-
+	// Schedule uplink data packet transmission with Max Weight policy
+	void scheduleMaxWeight();
+	int realtime_;  // Whether the traffic is realtime
 };
 
 #endif //  NS_SWIFI_H
