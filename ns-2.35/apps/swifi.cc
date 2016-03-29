@@ -98,9 +98,9 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 }
 
 SWiFiAgent::~SWiFiAgent()
-{ //TODO: Revise...
-	for (unsigned int i = 0; i < client_list_.size(); i++) {
-		delete client_list_[i];
+{
+	for (unsigned int i = 0; i < num_client_; i++) {
+		delete client_list_.at(i);
 	}
 	client_list_.clear();
 }
@@ -122,18 +122,26 @@ void SWiFiAgent::restart()
 	} else {
 		num_data_pkt_ = 0;
 	}
+	target_ = NULL;
 }
 
 void SWiFiAgent::reset()
 {
-	if (!is_server_) {
-		return;
-	}
 	for (unsigned int i = 0; i < num_client_; i++) {
 		delete client_list_.at(i);
 	}
 	client_list_.clear();
 	num_client_ = 0;
+	target_ = NULL;
+
+	num_data_pkt_ = 0;
+
+	poll_state_ = SWiFi_POLL_NONE;
+	if (retry_) {
+		advance_ = false;
+	} else {
+		advance_ = true;
+	}
 }
 // ************************************************
 // Table of commands:
