@@ -84,7 +84,6 @@ class SWiFiClient {
 
 public:
 	SWiFiClient();
-	bool is_active() {return is_active_;}
 
 	u_int32_t addr_; // address
 	double pn_;   // channel reliability
@@ -95,6 +94,8 @@ public:
 	u_int32_t exp_pkt_id_;   // Expected packet index.
 	u_int32_t num_data_pkt_; // Number of data packets received of client
 	u_int32_t queue_length_; // Remaining queue length of client
+
+	bool is_active() { return is_active_; }
 };
 
 class SWiFiAgent : public Agent {
