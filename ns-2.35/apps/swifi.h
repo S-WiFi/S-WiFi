@@ -16,12 +16,16 @@
 #include "address.h"
 #include "ip.h"
 #include "mac.h"
-#include <vector>   
+#include <vector>
 #include <fstream>  // For outputting data
+#include <sstream>
+#include <string>
 #include <algorithm> //for min
 using std::vector;
 using std::endl;
 using std::ofstream;
+using std::ostringstream;
+using std::string;
 using std::min;
 
 #define AP_IP 0 // It has to be 0 for ARP to find the AP correctly.

@@ -431,6 +431,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 				// First save the old packet's send_time
 				double stime = hdr->send_time_;
 				int rcv_seq = hdr->seq_;
+				u_int32_t pkt_id = hdr->exp_pkt_id_;
 				nsaddr_t ret_saddr = hdrip->daddr();
 				nsaddr_t ret_daddr = hdrip->saddr();
 				// Discard the packet
@@ -451,9 +452,16 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 				hdrret_ip->saddr() = ret_saddr;
 				hdrret_ip->daddr() = ret_daddr;
 				// Fill in the data payload
-				char *msg = "I'm feeling great!";
-				PacketData *data = new PacketData(1 + strlen(msg));
-				strcpy((char*)data->data(), msg);
+				u_int32_t node_id = ret_saddr >> Address::instance().NodeShift_[1];
+				ostringstream ss;
+				ss << "Here is node " << node_id << "'s pkt no. " << pkt_id << "!";
+
+				// Use reference to potentially extend its lifetime
+				// and avoid its c_str becomes invalid.
+				// cf. http://stackoverflow.com/a/1374485/1166587
+				const string& str = ss.str();
+				PacketData *data = new PacketData(1 + str.size());
+				strcpy((char*)data->data(), str.c_str());
 				pktret->setdata(data);
 				// Update queue length
 				queue_length_--;
