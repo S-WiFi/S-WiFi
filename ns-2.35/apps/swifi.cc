@@ -71,13 +71,17 @@ public:
 
 SWiFiClient::SWiFiClient() : addr_(0), is_active_(true)
 {
-	qn_ = 0;	    //throughput requirement
-	tier_ = 1;	    //tier of this client
-	pn_ = 0;        //channel reliability
+	pn_ = 0;
+	qn_ = 0;
+	init_ = 0;
+	tier_ = 1;
+	exp_pkt_id_ = 0;
+	num_data_pkt_ = 0;
+	queue_length_ = 0;
 }
 
 SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
-{ //TODO: Revise...
+{
 	num_client_ = 0;
 	client_list_ = vector<SWiFiClient*>();
 	is_server_ = 0;
@@ -98,21 +102,50 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 }
 
 SWiFiAgent::~SWiFiAgent()
-{ //TODO: Revise...
-	for (unsigned int i = 0; i < client_list_.size(); i++) {
-		delete client_list_[i];
+{
+	for (unsigned int i = 0; i < num_client_; i++) {
+		delete client_list_.at(i);
 	}
 	client_list_.clear();
 }
 
-void SWiFiAgent::Reset()
+void SWiFiAgent::restart()
 {
-	// Reset client list.
-	for (unsigned int i = 0; i < client_list_.size(); i++) {
-		delete client_list_[i];
+	if (is_server_) {
+		for (unsigned int i = 0; i < num_client_; i++) {
+			client_list_.at(i)->exp_pkt_id_ = 0;
+			client_list_.at(i)->num_data_pkt_ = 0;
+			client_list_.at(i)->queue_length_ = client_list_.at(i)->init_;
+		}
+		poll_state_ = SWiFi_POLL_NONE;
+		if (retry_) {
+			advance_ = false;
+		} else {
+			advance_ = true;
+		}
+	} else {
+		num_data_pkt_ = 0;
+	}
+	target_ = NULL;
+}
+
+void SWiFiAgent::reset()
+{
+	for (unsigned int i = 0; i < num_client_; i++) {
+		delete client_list_.at(i);
 	}
 	client_list_.clear();
 	num_client_ = 0;
+	target_ = NULL;
+
+	num_data_pkt_ = 0;
+
+	poll_state_ = SWiFi_POLL_NONE;
+	if (retry_) {
+		advance_ = false;
+	} else {
+		advance_ = true;
+	}
 }
 // ************************************************
 // Table of commands:
@@ -141,12 +174,12 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 		else if (strcmp (argv[1], "update_delivered") == 0){ //TODO: receive an ACK
 			return (TCL_OK);
 		}
-		else if (strcmp(argv[1], "update_failed") == 0){ //TODO: 
+		else if (strcmp(argv[1], "update_failed") == 0){ //TODO:
 			printf("failed!\n");
 			return (TCL_OK);
 		}
-		else if (strcmp (argv[1], "restart") == 0){ //TODO: restart the simulation
-			Reset();
+		else if (strcmp (argv[1], "restart") == 0){
+			restart();
 			return (TCL_OK);
 		}
 		else if (strcmp(argv[1], "report") == 0) { //TODO: Print data into a txt file
@@ -286,9 +319,8 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 	}
 	else if (argc == 6) {
 		if (strcmp(argv[1], "register") == 0) {
-			//TODO: Broadcasting a packet for link registration
 			Packet* pkt = allocpkt();
-			hdr_swifi* hdr = hdr_swifi::access(pkt);     
+			hdr_swifi* hdr = hdr_swifi::access(pkt);
 			hdr->ret_ = 0;		// a packet to register on the server
 			hdr->pn_ = atof(argv[2]);
 			hdr->qn_ = atof(argv[3]);
@@ -298,10 +330,10 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			num_data_pkt_ = atoi(argv[4]);
 			// Set packet size = 0
 			HDR_CMN(pkt)->size() = 0;
-			send(pkt, 0);     
+			send(pkt, 0);
 			return (TCL_OK);
 		}
-	}  
+	}
 	// If the command hasn't been processed by VoD_ScheduleAgent()::command,
 	// call the command() function for the base class
 	return (Agent::command(argc, argv));
@@ -319,7 +351,6 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	//this packet is to register  
 	if (hdr->ret_ == 0){ 
 		if(is_server_ == true){  //only server needs to deal with registration
-			//TODO: 
 			SWiFiClient* client = new SWiFiClient;
 			client_list_.push_back(client);
 			client_list_[num_client_]->addr_ = (u_int32_t)hdrip->saddr();
@@ -330,6 +361,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			client_list_[num_client_]->exp_pkt_id_ = 0;
 			// Note here num_data_pkt_ only counts those received.
 			client_list_[num_client_]->num_data_pkt_ = 0;
+			client_list_[num_client_]->init_ = hdr->init_;
 			client_list_[num_client_]->queue_length_ = hdr->init_;
 			//fprintf(stderr, "Registered: client %d, ip %d\n", num_client_, client_list_[num_client_]->addr_);
 			num_client_++;
@@ -417,24 +449,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 		}
 		Packet::free(pkt);
 		return;
-			
 	}
-/*
-	else if (hdr->ret_ == 7) {
-		if(is_server_ == true) {
-      		int i;
-      		for(i = 0; i < numclient_; i++) {
-        		if(client_list_[i]->addr_ == Ackaddr_)
-          			break;
-			}
-    		if(i < numclient_){  
-			//TODO: If transmission succeeded, set done_ to TRUE
-  				client_list_[i]->done_ = true;
-   			}
-		}
-     	return;
-	}
-*/
 	else if (hdr->ret_ == SWiFi_PKT_POLL_DATA) {
 		// Send a data packet from the client to the server.
 		if (!is_server_) {
