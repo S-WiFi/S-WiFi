@@ -226,8 +226,8 @@ Agent/SWiFi instproc recv {from rtt data} {
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
-	global n_rx num_trans distance reliability datf interval func
-	set reliability($n_run) [expr double($n_rx) * $interval / $num_trans]
+	global n_rx num_slots distance reliability datf interval func
+	set reliability($n_run) [expr double($n_rx) * $interval / $num_slots]
 	if {0 == [string compare $func "pcf"]} {
 		puts $datf "$reliability($n_run)"
 	} else {
@@ -338,7 +338,7 @@ if {0 == [string compare $func "reliability"]} {
 } else {
 	set num_runs   1
 }
-set num_trans  10000
+set num_slots  10000
 if {0 != [string compare $func "delay"]} {
 	set slot 0.01
 } else {
@@ -374,7 +374,7 @@ for {set k 0} {$k < $num_runs} {incr k} {
 			$ns_ at [expr $period*($k + 1) - 0.001] "$sw_($i) restart"
 		}
 	}
-	for {set i 0} {$i < $num_trans} {incr i} {
+	for {set i 0} {$i < $num_slots} {incr i} {
 		$ns_ at [expr $period * ($k + 1) + $i * $slot] "$command"
 		if { $i % $interval == 0} {
 			# boi = beginning of interval
