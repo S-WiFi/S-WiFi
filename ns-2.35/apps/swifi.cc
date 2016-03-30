@@ -71,37 +71,81 @@ public:
 
 SWiFiClient::SWiFiClient() : addr_(0), is_active_(true)
 {
-	qn_ = 0;	    //throughput requirement
-	tier_ = 1;	    //tier of this client
-	pn_ = 0;        //channel reliability
+	pn_ = 0;
+	qn_ = 0;
+	init_ = 0;
+	tier_ = 1;
+	exp_pkt_id_ = 0;
+	num_data_pkt_ = 0;
+	queue_length_ = 0;
 }
 
 SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
-{ //TODO: Revise...
+{
 	num_client_ = 0;
 	client_list_ = vector<SWiFiClient*>();
 	is_server_ = 0;
-	target_ = 0;
+	target_ = NULL;
+	num_data_pkt_ = 0;
+	poll_state_ = SWiFi_POLL_NONE;
 	bind("packet_size_", &size_);
 	bind("slot_interval_", &slot_interval_);
+	bind_bool("do_poll_num_", &do_poll_num_);
+	bind("pcf_policy_", &pcf_policy_);
+	bind_bool("retry_", &retry_);
+	if (retry_) {
+		advance_ = false;
+	} else {
+		advance_ = true;
+	}
+	bind_bool("realtime_", &realtime_);
 }
 
 SWiFiAgent::~SWiFiAgent()
-{ //TODO: Revise...
-	for (unsigned int i = 0; i < client_list_.size(); i++) {
-		delete client_list_[i];
+{
+	for (unsigned int i = 0; i < num_client_; i++) {
+		delete client_list_.at(i);
 	}
 	client_list_.clear();
 }
 
-void SWiFiAgent::Reset()
+void SWiFiAgent::restart()
 {
-	// Reset client list.
-	for (unsigned int i = 0; i < client_list_.size(); i++) {
-		delete client_list_[i];
+	if (is_server_) {
+		for (unsigned int i = 0; i < num_client_; i++) {
+			client_list_.at(i)->exp_pkt_id_ = 0;
+			client_list_.at(i)->num_data_pkt_ = 0;
+			client_list_.at(i)->queue_length_ = client_list_.at(i)->init_;
+		}
+		poll_state_ = SWiFi_POLL_NONE;
+		if (retry_) {
+			advance_ = false;
+		} else {
+			advance_ = true;
+		}
+	} else {
+		num_data_pkt_ = 0;
+	}
+	target_ = NULL;
+}
+
+void SWiFiAgent::reset()
+{
+	for (unsigned int i = 0; i < num_client_; i++) {
+		delete client_list_.at(i);
 	}
 	client_list_.clear();
 	num_client_ = 0;
+	target_ = NULL;
+
+	num_data_pkt_ = 0;
+
+	poll_state_ = SWiFi_POLL_NONE;
+	if (retry_) {
+		advance_ = false;
+	} else {
+		advance_ = true;
+	}
 }
 // ************************************************
 // Table of commands:
@@ -111,7 +155,7 @@ void SWiFiAgent::Reset()
 // 4. sw_(0) report
 // 5. sw_(0) update_delivered/update_failed
 // 6. sw_(0) mac $mymac
-// 7. sw_(0) register $qn $init $tier
+// 7. sw_(0) register $pn $qn $init $tier
 // 8. sw_(0) poll
 // ************************************************
 
@@ -120,17 +164,22 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 	if (argc == 2) {
 		if (strcmp(argv[1], "server") == 0) {
 			is_server_ = true;
+			if (do_poll_num_) {
+				poll_state_ = SWiFi_POLL_NUM;
+			} else {
+				poll_state_ = SWiFi_POLL_DATA;
+			}
 			return (TCL_OK);
 		}
 		else if (strcmp (argv[1], "update_delivered") == 0){ //TODO: receive an ACK
 			return (TCL_OK);
 		}
-		else if (strcmp(argv[1], "update_failed") == 0){ //TODO: 
+		else if (strcmp(argv[1], "update_failed") == 0){ //TODO:
 			printf("failed!\n");
 			return (TCL_OK);
 		}
-		else if (strcmp (argv[1], "restart") == 0){ //TODO: restart the simulation
-			Reset();
+		else if (strcmp (argv[1], "restart") == 0){
+			restart();
 			return (TCL_OK);
 		}
 		else if (strcmp(argv[1], "report") == 0) { //TODO: Print data into a txt file
@@ -142,8 +191,14 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			return (TCL_OK);
 		}
 		else if (strcmp(argv[1], "send") == 0) {
+			if (!is_server_) {
+				Tcl& tcl = Tcl::instance();
+				tcl.add_error("Only server AP can send downlink data.");
+				return (TCL_ERROR);
+			}
+			scheduleRoundRobin(true);
 			// Create a new packet
-				Packet* pkt = allocpkt();
+			Packet* pkt = allocpkt();
 			// Access the header for the new packet:
 			hdr_swifi* hdr = hdr_swifi::access(pkt);
 			// Let the 'ret_' field be 0, so the receiving node
@@ -152,65 +207,133 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
-			// IP information  			
+			// Set IP addr
 			hdr_ip *ip = hdr_ip::access(pkt);
+			ip->saddr() = AP_IP;
+			ip->daddr() = target_->addr_;
 			// Broadcasting only. Need to specify ip and ACK address later on.			
 			send(pkt, 0);  
-			
-			
-			
 
 			// return TCL_OK, so the calling function knows that
 			// the command has been processed
 			return (TCL_OK);   
 		}
 		else if (strcmp(argv[1], "poll") == 0) {
-			// Create a new POLL packet
+			if (!is_server_) {
+				Tcl& tcl = Tcl::instance();
+				tcl.add_error("Only server AP can poll.");
+				return (TCL_ERROR);
+			}
+			if (poll_state_ == SWiFi_POLL_NUM) {
+				if (pcf_policy_ == SWiFi_PCF_BASELINE) {
+					scheduleRoundRobin(false);
+				} else if (pcf_policy_ == SWiFi_PCF_SMART) {
+					//FIXME
+					scheduleRoundRobin(false);
+				}
+				if (!target_) {
+					// No more clients to poll num. Poll data.
+					poll_state_ = SWiFi_POLL_DATA;
+				}
+			}
+			if (poll_state_ == SWiFi_POLL_DATA) {
+				scheduleMaxWeight();
+			}
+			if (!target_) {
+				// No more clients to schedule. Idle.
+				poll_state_ = SWiFi_POLL_IDLE;
+				return (TCL_OK);
+			}
+			// Create a new packet
 			Packet* pkt = allocpkt();
 			// Access the header for the new packet:
 			hdr_swifi* hdr = hdr_swifi::access(pkt);
-			// Let the 'ret_' field be SWiFi_PKT_POLL, so the
-			// receiving node (client)
-			// knows that it has to generate an data packet
-			// per Problem 2.
-			hdr->ret_ = SWiFi_PKT_POLL; // It's a POLL packet
+			// Set packet type per state
+			if (poll_state_ == SWiFi_POLL_NUM) {
+				hdr->ret_ = SWiFi_PKT_POLL_NUM; // It's a POLL_NUM packet
+			} else if (poll_state_ == SWiFi_POLL_DATA) {
+				hdr->ret_ = SWiFi_PKT_POLL_DATA; // It's a POLL_DATA packet
+			} else {
+				fprintf(stderr, "You have walked into the void.\n");
+				exit(1);
+			}
 			hdr->seq_ = seq_++;
 			// Store the current time in the 'send_time' field
 			hdr->send_time_ = Scheduler::instance().clock();
 			// Set packet size = 0
 			HDR_CMN(pkt)->size() = 0;
-			// Broadcasting only. Need to specify ip address later on.			
+			// Set IP addr
+			hdr_ip *ip = hdr_ip::access(pkt);
+			ip->saddr() = AP_IP;
+			ip->daddr() = target_->addr_;
+			hdr->exp_pkt_id_ = target_->exp_pkt_id_;
+			// Send it out
 			send(pkt, 0);
 			// return TCL_OK, so the calling function knows that
 			// the command has been processed
 			return (TCL_OK);
 		}
+		else if (strcmp(argv[1], "boi") == 0) {
+			if (is_server_) {
+				target_ = NULL;
+				if (do_poll_num_) {
+					poll_state_ = SWiFi_POLL_NUM;
+				} else {
+					poll_state_ = SWiFi_POLL_DATA;
+				}
+				if (realtime_) {
+					for (unsigned i = 0; i < num_client_; i++) {
+						client_list_.at(i)->num_data_pkt_ = 0;
+						client_list_.at(i)->exp_pkt_id_ = 0;
+					}
+				}
+			}
+			return (TCL_OK);
+		}
 	}
 	else if (argc == 3) {
-        if (strcmp(argv[1], "mac") == 0){ 
+	        if (strcmp(argv[1], "mac") == 0){ 
 			mac_ = (Mac*)TclObject::lookup(argv[2]);
 			if(mac_ == 0) {
 			//TODO: printing...
 				printf("mac error!\n");
 			}
 			return (TCL_OK);
-		}	
-	}
-	else if (argc == 5) {
-		if (strcmp(argv[1], "register") == 0) {
-			//TODO: Broadcasting a packet for link registration
-			Packet* pkt = allocpkt();
-			hdr_swifi* hdr = hdr_swifi::access(pkt);     
-			hdr->ret_ = 0;		// a packet to register on the server
-			hdr->qn_ = atoi(argv[2]);
-			hdr->tier_ = atoi(argv[3]);
-			hdr->init_ = atoi(argv[4]);
-			// Set packet size = 0
-			HDR_CMN(pkt)->size() = 0;
-			send(pkt, 0);     
+		}
+		if (strcmp(argv[1], "pour") == 0){
+			if (atoi(argv[2]) >= 0) {
+				if (realtime_) {
+					num_data_pkt_ = atoi(argv[2]);
+				} else {
+					num_data_pkt_ += atoi(argv[2]);
+				}
+				// printf("current number of data packets = %d \n", num_data_pkt_);
+				Tcl& tcl = Tcl::instance();
+				tcl.evalf("%s alog %d", name(), num_data_pkt_);
+			}
+			else {
+				printf("arrivals should be nonnegative!\n");
+			}
 			return (TCL_OK);
 		}
-	}  
+	}
+	else if (argc == 6) {
+		if (strcmp(argv[1], "register") == 0) {
+			Packet* pkt = allocpkt();
+			hdr_swifi* hdr = hdr_swifi::access(pkt);
+			hdr->ret_ = 0;		// a packet to register on the server
+			hdr->pn_ = atof(argv[2]);
+			hdr->qn_ = atof(argv[3]);
+			hdr->init_ = atoi(argv[4]);
+			hdr->tier_ = atoi(argv[5]);
+			// Set initial number of data packets of a client
+			num_data_pkt_ = atoi(argv[4]);
+			// Set packet size = 0
+			HDR_CMN(pkt)->size() = 0;
+			send(pkt, 0);
+			return (TCL_OK);
+		}
+	}
 	// If the command hasn't been processed by VoD_ScheduleAgent()::command,
 	// call the command() function for the base class
 	return (Agent::command(argc, argv));
@@ -228,24 +351,35 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	//this packet is to register  
 	if (hdr->ret_ == 0){ 
 		if(is_server_ == true){  //only server needs to deal with registration
-			//TODO: 
 			SWiFiClient* client = new SWiFiClient;
 			client_list_.push_back(client);
 			client_list_[num_client_]->addr_ = (u_int32_t)hdrip->saddr();
 			client_list_[num_client_]->tier_ = hdr->tier_;
 			client_list_[num_client_]->qn_ = hdr->qn_;
-			client_list_[num_client_]->pn_ = 0; // Not in use for now. 
+			client_list_[num_client_]->pn_ = hdr->pn_; // Now in use. 
 			client_list_[num_client_]->is_active_ = true;
+			client_list_[num_client_]->exp_pkt_id_ = 0;
+			// Note here num_data_pkt_ only counts those received.
+			client_list_[num_client_]->num_data_pkt_ = 0;
+			client_list_[num_client_]->init_ = hdr->init_;
+			client_list_[num_client_]->queue_length_ = hdr->init_;
+			//fprintf(stderr, "Registered: client %d, ip %d\n", num_client_, client_list_[num_client_]->addr_);
 			num_client_++;
 		} 
 		Packet::free(pkt);
 		return;
 	}
 	// This is a data packet from client to server (UPLINK).
-	// Assume it is the reply of POLL packet from server to client.
+	// Assume it is the reply of POLL_DATA packet from server to client.
 	else if (hdr->ret_ == 2) {
 		if (is_server_ && pkt->userdata()
 			       && pkt->userdata()->type() == PACKET_DATA) {
+			//fprintf(stderr, "Received uplink data packet: src addr=%d, dest addr=%d\n", hdrip->saddr(), hdrip->daddr());
+			target_->queue_length_--;
+			target_->exp_pkt_id_++;
+			target_->num_data_pkt_++;
+			//fprintf(stderr, "addr=%d, queue_length_=%d, exp_pkt_id_=%d, num_data_pkt_=%d\n",
+					//hdrip->saddr(), target_->queue_length_, target_->exp_pkt_id_, target_->num_data_pkt_);
 			PacketData* data = (PacketData*)pkt->userdata();
 			// Use tcl.eval to call the Tcl
 			// interpreter with the poll results.
@@ -315,32 +449,24 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 		}
 		Packet::free(pkt);
 		return;
-			
 	}
-/*
-	else if (hdr->ret_ == 7) {
-		if(is_server_ == true) {
-      		int i;
-      		for(i = 0; i < numclient_; i++) {
-        		if(client_list_[i]->addr_ == Ackaddr_)
-          			break;
-			}
-    		if(i < numclient_){  
-			//TODO: If transmission succeeded, set done_ to TRUE
-  				client_list_[i]->done_ = true;
-   			}
-		}
-     	return;
-	}
-*/
-	else if (hdr->ret_ == SWiFi_PKT_POLL) {
+	else if (hdr->ret_ == SWiFi_PKT_POLL_DATA) {
 		// Send a data packet from the client to the server.
 		if (!is_server_) {
+			//fprintf(stderr, "Received POLL_DATA: src addr=%d, dst addr=%d\n", hdrip->saddr(), hdrip->daddr());
+			// Note copy assignments are necessary unless free(pkt) is delayed.
 			// First save the old packet's send_time
 			double stime = hdr->send_time_;
 			int rcv_seq = hdr->seq_;
+			u_int32_t pkt_id = hdr->exp_pkt_id_;
+			nsaddr_t ret_saddr = hdrip->daddr();
+			nsaddr_t ret_daddr = hdrip->saddr();
 			// Discard the packet
 			Packet::free(pkt);
+			if (pkt_id > num_data_pkt_) {
+				fprintf(stderr, "Bug: exp_pkt_id_ > num_data_pkt_\n");
+				exit(1);
+			}
 			// Create a new packet
 			Packet* pktret = allocpkt();
 			// Access the packet header for the new packet:
@@ -352,13 +478,133 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			// Added by Andrei Gurtov for one-way delay measurement.
 			hdrret->rcv_time_ = Scheduler::instance().clock();
 			hdrret->seq_ = rcv_seq;
+			// Set destination IP addr
+			hdr_ip* hdrret_ip = HDR_IP(pktret);
+			hdrret_ip->saddr() = ret_saddr;
+			hdrret_ip->daddr() = ret_daddr;
 			// Fill in the data payload
-			char *msg = "I'm feeling great!";
-			PacketData *data = new PacketData(1 + strlen(msg));
-			strcpy((char*)data->data(), msg);
+			u_int32_t node_id = ret_saddr >> Address::instance().NodeShift_[1];
+			ostringstream ss;
+			ss << "Here is node " << node_id << "'s pkt no. " << pkt_id << "!";
+			// Use reference to potentially extend its lifetime
+			// and avoid its c_str becomes invalid.
+			// cf. http://stackoverflow.com/a/1374485/1166587
+			const string& str = ss.str();
+			PacketData *data = new PacketData(1 + str.size());
+			strcpy((char*)data->data(), str.c_str());
 			pktret->setdata(data);
 			// Send the packet
 			send(pktret, 0);
+			//fprintf(stderr, "Sent data: src addr=%d, dst addr=%d\n", hdrret_ip->saddr(), hdrret_ip->daddr());
 		}
+	}
+	else if (hdr->ret_ == SWiFi_PKT_POLL_NUM) {
+		if (!is_server_) {
+			// Note copy assignments are necessary unless free(pkt) is delayed.
+			double stime = hdr->send_time_;
+			int rcv_seq = hdr->seq_;
+			nsaddr_t ret_saddr = hdrip->daddr();
+			nsaddr_t ret_daddr = hdrip->saddr();
+			// Discard the packet
+			Packet::free(pkt);
+			// Create a new packet
+			Packet* pktret = allocpkt();
+			// Access the packet header for the new packet:
+			hdr_swifi* hdrret = hdr_swifi::access(pktret);
+			// Set ret to uplink packet with num of pkts at client
+			hdrret->ret_ = SWiFi_PKT_NUM_UL;
+			// Set the send_time field to the correct value
+			hdrret->send_time_ = stime;
+			// Added by Andrei Gurtov for one-way delay measurement.
+			hdrret->rcv_time_ = Scheduler::instance().clock();
+			hdrret->seq_ = rcv_seq;
+			// Set packet size = 0
+			HDR_CMN(pkt)->size() = 0;
+			// Set destination IP addr
+			hdr_ip* hdrret_ip = HDR_IP(pktret);
+			hdrret_ip->saddr() = ret_saddr;
+			hdrret_ip->daddr() = ret_daddr;
+			hdrret->num_data_pkt_ = num_data_pkt_;
+			// Send the packet
+			send(pktret, 0);
+			//fprintf(stderr, "Sent num: src addr=%d, dst addr=%d\n", hdrret_ip->saddr(), hdrret_ip->daddr());
+		}
+	}
+	// This is a SWiFi_PKT_NUM_UL packet from client to server (UPLINK).
+	else if (hdr->ret_ == SWiFi_PKT_NUM_UL) {
+		if (is_server_) {
+			//fprintf(stderr, "Received uplink num packet: src addr=%d, dest addr=%d\n", hdrip->saddr(), hdrip->daddr());
+			if (retry_) {
+				advance_ = true;
+			}
+			// The current queue length is equal to
+			// the number of data packets generated minus
+			// the number of data packets received so far.
+			// For realtime traffic, num_data_pkt_ should be 0.
+			if (realtime_ && target_->num_data_pkt_ != 0) {
+				fprintf(stderr, "You have found a bug about num_data_pkt_!\n");
+				exit(1);
+			}
+			target_->queue_length_ =
+				hdr->num_data_pkt_ - target_->num_data_pkt_;
+			if (target_->exp_pkt_id_ == 0 && target_->queue_length_ > 0) {
+				target_->exp_pkt_id_ = 1;
+			}
+			Tcl& tcl = Tcl::instance();
+			tcl.evalf("qlog %d %d", target_->addr_, target_->queue_length_);
+		}
+		Packet::free(pkt);
+		return;
+	}
+}
+
+void SWiFiAgent::scheduleRoundRobin(bool loop)
+{
+	if (!is_server_) {
+		return;
+	}
+	if (!target_) {
+		target_ = client_list_.at(0);
+		return;
+	}
+	if (advance_) {
+		if (!loop && target_ == client_list_.back()) {
+			target_ = NULL;
+			return;
+		}
+		for (u_int32_t i = 0; i < num_client_; i++) {
+			if (target_ == client_list_.at(i)) {
+				target_ = client_list_.at((i + 1) % num_client_);
+				if (retry_) {
+					advance_ = false;
+				}
+				return;
+			}
+		}
+	}
+}
+
+// Schedule uplink packet transmission with the Max Weight policy
+void SWiFiAgent::scheduleMaxWeight()
+{
+	if (!is_server_ || num_client_ < 1) {
+		target_ = NULL;
+		return;
+	}
+
+	double Wmax; // the max weight (queue length * channel reliability)
+
+	// Start with the first client.
+	// Note vector::at() is safer than operator [] due to bound checking.
+	target_ = client_list_.at(0);
+	Wmax = target_->queue_length_ * target_->pn_;
+	for (unsigned int j = 1; j < num_client_; j++){
+		if (client_list_.at(j)->queue_length_ * client_list_.at(j)->pn_ > Wmax) {
+			target_ = client_list_.at(j);
+			Wmax = target_->queue_length_ * target_->pn_;
+		}
+	}
+	if (Wmax == 0) {
+		target_ = NULL;
 	}
 }
