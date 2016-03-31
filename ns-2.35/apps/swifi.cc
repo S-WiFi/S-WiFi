@@ -115,7 +115,7 @@ void SWiFiAgent::restart()
 		for (unsigned int i = 0; i < num_client_; i++) {
 			client_list_.at(i)->exp_pkt_id_ = 0;
 			client_list_.at(i)->num_data_pkt_ = 0;
-			client_list_.at(i)->queue_length_ = client_list_.at(i)->init_;
+			client_list_.at(i)->queue_length_ = 0;
 		}
 		poll_state_ = SWiFi_POLL_NONE;
 		if (retry_) {
@@ -237,7 +237,11 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				}
 			}
 			if (poll_state_ == SWiFi_POLL_DATA) {
-				scheduleMaxWeight();
+				if (do_poll_num_) {
+					scheduleMaxWeight();
+				} else {
+					target_ = client_list_.front();
+				}
 			}
 			if (!target_) {
 				// No more clients to schedule. Idle.
