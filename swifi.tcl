@@ -98,6 +98,15 @@ if {$argc < 3} {
 } else {
 	set interval [lindex $argv 2]
 }
+if {$argc < 4} {
+	if {0 == [string compare $func "pcf"]} {
+		set val(nn)             3          ;# number of mobilenodes
+	} else {
+		set val(nn)             2          ;# number of mobilenodes
+	}
+} else {
+	set val(nn) [expr [lindex $argv 3] + 1]
+}
 if {0 == [string compare $func "pcf"]} {
 	if {0 == [string compare $mode "baseline"] || 0 == [string compare $mode "smart"]} {
 		# Disable retry in MAC layer.
@@ -126,7 +135,7 @@ if {[expr 0 == [string compare $func "pcf"] && 0 == [string compare $mode "smart
 	exit 1
 }
 
-puts "func: $func, mode: $mode, interval: $interval"
+puts "func: $func, mode: $mode, interval: $interval, number of nodes: $val(nn)"
 
 # ======================================================================
 # Define options
@@ -140,11 +149,6 @@ set val(ifq)            Queue/DropTail/PriQueue    ;# interface queue type
 set val(ll)             LL                         ;# link layer type
 set val(ant)            Antenna/OmniAntenna        ;# antenna model
 set val(ifqlen)         50                         ;# max packet in ifq
-if {0 == [string compare $func "pcf"]} {
-	set val(nn)             3                  ;# number of mobilenodes
-} else {
-	set val(nn)             2                  ;# number of mobilenodes
-}
 set val(rp)             DumbAgent                  ;# routing protocol
 
 
@@ -290,9 +294,9 @@ set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
 if {0 != [string compare $func "delay"]} {
-	# FIXME better way to specify distances
-	set distance(0) 1000
-	set distance(1) 1000
+	for {set i 1} {$i < $val(nn)} {incr i} {
+		set distance([expr $i - 1]) 1000
+	}
 } else {
 	# Set the distance that the reliability is >= 55% per Problem 3.
 	set distance(0) 1000
