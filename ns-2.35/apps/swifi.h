@@ -29,6 +29,7 @@ using std::string;
 using std::min;
 
 #define AP_IP 0 // It has to be 0 for ARP to find the AP correctly.
+#define TOL 1e-3
 
 enum swifi_pkt_t {
 	SWiFi_PKT_POLL_NUM  = 9,  // poll number of packets in uplink

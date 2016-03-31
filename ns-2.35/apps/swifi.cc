@@ -267,6 +267,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			ip->saddr() = AP_IP;
 			ip->daddr() = target_->addr_;
 			hdr->exp_pkt_id_ = target_->exp_pkt_id_;
+			//fprintf(stderr, "POLL: target addr=%d, exp_pkt_id_=%d, queue_length_=%d\n", target_->addr_, target_->exp_pkt_id_, target_->queue_length_);
 			// Send it out
 			send(pkt, 0);
 			// return TCL_OK, so the calling function knows that
@@ -285,6 +286,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 					for (unsigned i = 0; i < num_client_; i++) {
 						client_list_.at(i)->num_data_pkt_ = 0;
 						client_list_.at(i)->exp_pkt_id_ = 0;
+						client_list_.at(i)->queue_length_ = 0;
 					}
 				}
 			}
@@ -307,7 +309,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				} else {
 					num_data_pkt_ += atoi(argv[2]);
 				}
-				// printf("current number of data packets = %d \n", num_data_pkt_);
+				//fprintf(stderr, "%s current number of data packets = %d \n", name(), num_data_pkt_);
 				Tcl& tcl = Tcl::instance();
 				tcl.evalf("%s alog %d", name(), num_data_pkt_);
 			}
@@ -317,20 +319,22 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			return (TCL_OK);
 		}
 	}
-	else if (argc == 6) {
+	else if (argc == 4) {
 		if (strcmp(argv[1], "register") == 0) {
-			Packet* pkt = allocpkt();
-			hdr_swifi* hdr = hdr_swifi::access(pkt);
-			hdr->ret_ = 0;		// a packet to register on the server
-			hdr->pn_ = atof(argv[2]);
-			hdr->qn_ = atof(argv[3]);
-			hdr->init_ = atoi(argv[4]);
-			hdr->tier_ = atoi(argv[5]);
-			// Set initial number of data packets of a client
-			num_data_pkt_ = atoi(argv[4]);
-			// Set packet size = 0
-			HDR_CMN(pkt)->size() = 0;
-			send(pkt, 0);
+			if (!is_server_) {
+				return (TCL_ERROR);
+			}
+
+			SWiFiClient* client = new SWiFiClient;
+			client_list_.push_back(client);
+			client_list_[num_client_]->addr_ = (u_int32_t)atoi(argv[2]);
+			client_list_[num_client_]->pn_ = atof(argv[2]);
+			client_list_[num_client_]->exp_pkt_id_ = 0;
+			// Note here num_data_pkt_ only counts those received.
+			client_list_[num_client_]->num_data_pkt_ = 0;
+			client_list_[num_client_]->queue_length_ = 0;
+			fprintf(stderr, "Registered: client %d, ip %d\n", num_client_, client_list_[num_client_]->addr_);
+			num_client_++;
 			return (TCL_OK);
 		}
 	}
@@ -464,7 +468,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			// Discard the packet
 			Packet::free(pkt);
 			if (pkt_id > num_data_pkt_) {
-				fprintf(stderr, "Bug: exp_pkt_id_ > num_data_pkt_\n");
+				fprintf(stderr, "Bug: exp_pkt_id_ %d > num_data_pkt_ %d\n", pkt_id, num_data_pkt_);
 				exit(1);
 			}
 			// Create a new packet
@@ -527,13 +531,13 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			hdrret->num_data_pkt_ = num_data_pkt_;
 			// Send the packet
 			send(pktret, 0);
-			//fprintf(stderr, "Sent num: src addr=%d, dst addr=%d\n", hdrret_ip->saddr(), hdrret_ip->daddr());
+			//fprintf(stderr, "Sent num %d: src addr=%d, dst addr=%d\n", num_data_pkt_, hdrret_ip->saddr(), hdrret_ip->daddr());
 		}
 	}
 	// This is a SWiFi_PKT_NUM_UL packet from client to server (UPLINK).
 	else if (hdr->ret_ == SWiFi_PKT_NUM_UL) {
 		if (is_server_) {
-			//fprintf(stderr, "Received uplink num packet: src addr=%d, dest addr=%d\n", hdrip->saddr(), hdrip->daddr());
+			//fprintf(stderr, "Received uplink num packet: src addr=%d, dest addr=%d, num=%d\n", hdrip->saddr(), hdrip->daddr(), hdr->num_data_pkt_);
 			if (retry_) {
 				advance_ = true;
 			}
@@ -547,6 +551,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			}
 			target_->queue_length_ =
 				hdr->num_data_pkt_ - target_->num_data_pkt_;
+			//fprintf(stderr, "addr=%d, rx=%d, queue_length_=%d\n", target_->addr_, target_->num_data_pkt_, target_->queue_length_);
 			if (target_->exp_pkt_id_ == 0 && target_->queue_length_ > 0) {
 				target_->exp_pkt_id_ = 1;
 			}
@@ -604,7 +609,7 @@ void SWiFiAgent::scheduleMaxWeight()
 			Wmax = target_->queue_length_ * target_->pn_;
 		}
 	}
-	if (Wmax == 0) {
+	if (Wmax < TOL) {
 		target_ = NULL;
 	}
 }
