@@ -235,7 +235,7 @@
 \section{Simulation}
 
 \begin{frame}
-\frametitle{Simulation Results}
+\frametitle{Simulation Results: Network Capacity}
 \begin{itemize}
 \item $N=2$ and $T=10$
 \item Reliable channel: $p_1 = p_2 = 1$ (symmetric)
@@ -245,11 +245,12 @@
 \begin{figure}
 \centering
 \includegraphics[height=.5\textheight]{nonrealtime_throughput_randmax.pdf}
+\caption{Phase 1 polling reduces the capacity.}
 \end{figure}
 \end{frame}
 
 \begin{frame}
-\frametitle{Simulation Results}
+\frametitle{Simulation Results: Network Capacity}
 \begin{itemize}
 \item $N=2$ and $T=10$
 \item Reliable channel: $p_1 = p_2 = 1$ (symmetric)
@@ -259,11 +260,12 @@
 \begin{figure}
 \centering
 \includegraphics[height=.5\textheight]{realtime_throughput_randmax.pdf}
+\caption{Packet deadline reduces the capacity further.}
 \end{figure}
 \end{frame}
 
 \begin{frame}
-\frametitle{Simulation Results}
+\frametitle{Simulation Results: Interval Length}
 \begin{itemize}
 \item $N=2$
 \item Unreliable channel: $p_1 = p_2 \approx 0.57$ (distance \SI{1000}{m})
@@ -273,11 +275,12 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[height=.5\textheight]{nonrealtime_throughput_T.pdf}
+  \caption{Interval should be long enough to guarantee deliveries.}
 \end{figure}
 \end{frame}
 
 \begin{frame}
-\frametitle{Simulation Results}
+\frametitle{Simulation Results: Interval Length}
 \begin{itemize}
 \item $N=2$
 \item Unreliable channel: $p_1 = p_2 \approx 0.57$ (distance \SI{1000}{m})
@@ -287,6 +290,7 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[height=.5\textheight]{realtime_throughput_T.pdf}
+  \caption{Interval should be longer when packet can expire.}
 \end{figure}
 \end{frame}
 
@@ -301,6 +305,7 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[height=.5\textheight]{nonrealtime_throughput_N.pdf}
+  \caption{Performance degrades severely with more clients.}
 \end{figure}
 \end{frame}
 
@@ -315,7 +320,16 @@
 \begin{figure}[htbp]
   \centering
   \includegraphics[height=.5\textheight]{realtime_throughput_N.pdf}
+  \caption{Performance is worse and also degrades with more clients.}
 \end{figure}
+\end{frame}
+
+\section*{Conclusion}
+\begin{frame}{Conclusion}
+  \begin{itemize}
+    \item The baseline policy incurs huge overhead especially with large $N$ and small $T$
+    \item We need a smarter policy!
+  \end{itemize}
 \end{frame}
 
 
