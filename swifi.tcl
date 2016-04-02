@@ -93,6 +93,20 @@ switch -glob -nocase $mode {
 		usage
 	}
 }
+if {$argc < 3} {
+	set interval 10
+} else {
+	set interval [lindex $argv 2]
+}
+if {$argc < 4} {
+	if {0 == [string compare $func "pcf"]} {
+		set val(nn)             3          ;# number of mobilenodes
+	} else {
+		set val(nn)             2          ;# number of mobilenodes
+	}
+} else {
+	set val(nn) [expr [lindex $argv 3] + 1]
+}
 if {0 == [string compare $func "pcf"]} {
 	if {0 == [string compare $mode "baseline"] || 0 == [string compare $mode "smart"]} {
 		# Disable retry in MAC layer.
@@ -121,7 +135,7 @@ if {[expr 0 == [string compare $func "pcf"] && 0 == [string compare $mode "smart
 	exit 1
 }
 
-puts "func: $func, mode: $mode"
+puts "func: $func, mode: $mode, interval: $interval, number of nodes: $val(nn)"
 
 # ======================================================================
 # Define options
@@ -135,11 +149,6 @@ set val(ifq)            Queue/DropTail/PriQueue    ;# interface queue type
 set val(ll)             LL                         ;# link layer type
 set val(ant)            Antenna/OmniAntenna        ;# antenna model
 set val(ifqlen)         50                         ;# max packet in ifq
-if {0 == [string compare $func "pcf"]} {
-	set val(nn)             3                  ;# number of mobilenodes
-} else {
-	set val(nn)             2                  ;# number of mobilenodes
-}
 set val(rp)             DumbAgent                  ;# routing protocol
 
 
@@ -226,8 +235,8 @@ Agent/SWiFi instproc recv {from rtt data} {
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
-	global n_rx num_trans distance reliability datf interval func
-	set reliability($n_run) [expr double($n_rx) * $interval / $num_trans]
+	global n_rx num_slots distance reliability datf interval func
+	set reliability($n_run) [expr double($n_rx) * $interval / $num_slots]
 	if {0 == [string compare $func "pcf"]} {
 		puts $datf "$reliability($n_run)"
 	} else {
@@ -285,10 +294,9 @@ set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
 if {0 != [string compare $func "delay"]} {
-	# FIXME better way to specify distances
-	set distance(0) 1
-	set distance(1) 100
-	set distance(2) 200
+	for {set i 1} {$i < $val(nn)} {incr i} {
+		set distance([expr $i - 1]) 1000
+	}
 } else {
 	# Set the distance that the reliability is >= 55% per Problem 3.
 	set distance(0) 1000
@@ -306,7 +314,7 @@ foreach {fullmatch m1 m2} [regexp -all -line -inline $pattern $lutfile] {
 for {set i 1} {$i < $val(nn) } {incr i} {
 	set node_($i) [$ns_ node]	
 	$node_($i) random-motion 0		;# disable random motion
-	$node_($i) set X_ [expr 3.0 + $distance($i)]
+	$node_($i) set X_ [expr 3.0 + $distance([expr $i - 1])]
 	$node_($i) set Y_ 100
 	$node_($i) set Z_ 0
 	set sw_($i) [new Agent/SWiFi]
@@ -324,12 +332,11 @@ $ns_ at 0.5 "$sw_(0) server"
 
 for {set i 1} {$i < $val(nn)} {incr i} {
 	$ns_ connect $sw_($i) $sw_(0)
-	set cmd "$sw_($i) register $lut($distance($i)) 0 0 0"
+	set cmd "$sw_(0) register $i $lut([expr abs($distance([expr $i - 1]))])"
 	#puts "register cmd: $cmd"
 	$ns_ at [expr 3.0 + 0.1*$i] $cmd
 }
 
-set period     100.0
 if {0 == [string compare $func "reliability"]} {
 	set num_runs   21
 	set delta_dist 100
@@ -338,7 +345,7 @@ if {0 == [string compare $func "reliability"]} {
 } else {
 	set num_runs   1
 }
-set num_trans  10000
+set num_slots  [expr $interval * 1000]
 if {0 != [string compare $func "delay"]} {
 	set slot 0.01
 } else {
@@ -346,8 +353,8 @@ if {0 != [string compare $func "delay"]} {
 	set rtt 0.001625
 	set slot [expr 2 * $rtt]
 }
-# specify the number of slots in an interval
-set interval 10
+set period     [expr $num_slots * $slot]
+
 set rand_min 0
 set rand_max 2
 
@@ -374,7 +381,7 @@ for {set k 0} {$k < $num_runs} {incr k} {
 			$ns_ at [expr $period*($k + 1) - 0.001] "$sw_($i) restart"
 		}
 	}
-	for {set i 0} {$i < $num_trans} {incr i} {
+	for {set i 0} {$i < $num_slots} {incr i} {
 		$ns_ at [expr $period * ($k + 1) + $i * $slot] "$command"
 		if { $i % $interval == 0} {
 			# boi = beginning of interval
