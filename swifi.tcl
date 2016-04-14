@@ -237,6 +237,7 @@ if {0 == [string compare $mode "smart"]} {
 	Agent/SWiFi set pcf_policy_ 1
 }
 Agent/SWiFi set realtime_ true
+Agent/SWiFi set max_num_scheduled_clients_ 3
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]

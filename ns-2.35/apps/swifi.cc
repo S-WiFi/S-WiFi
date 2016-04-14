@@ -99,6 +99,10 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 		advance_ = true;
 	}
 	bind_bool("realtime_", &realtime_);
+	bind_bool("max_num_scheduled_clients_", &max_num_scheduled_clients_);
+	num_scheduled_clients_ = 0;
+
+	initRandomNumberGenerator();
 }
 
 SWiFiAgent::~SWiFiAgent()
@@ -228,8 +232,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				if (pcf_policy_ == SWiFi_PCF_BASELINE) {
 					scheduleRoundRobin(false);
 				} else if (pcf_policy_ == SWiFi_PCF_SMART) {
-					//FIXME
-					scheduleRoundRobin(false);
+					scheduleSelectively();
 				}
 				if (!target_) {
 					// No more clients to poll num. Poll data.
@@ -293,6 +296,16 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 						client_list_.at(i)->queue_length_ = 0;
 					}
 				}
+				num_scheduled_clients_ = 0;
+				// initPermutation can be done only after all
+				// cliens register.
+				// It is only necessary at the first interval.
+				// Re-run it at each interval might have a small
+				// performance loss,
+				// but the good thing is that
+				// we do not need yet another tcl command.
+				initPermutation();
+				randomPermutation();
 			}
 			return (TCL_OK);
 		}
@@ -590,6 +603,50 @@ void SWiFiAgent::scheduleRoundRobin(bool loop)
 				return;
 			}
 		}
+	}
+}
+
+void SWiFiAgent::initPermutation()
+{
+	client_permutation_.clear();
+	for (unsigned i = 0; i < num_client_; i++) {
+		client_permutation_.push_back(i);
+	}
+}
+
+void SWiFiAgent::initRandomNumberGenerator()
+{
+	random_device rd;
+	rng.seed(rd());
+}
+
+void SWiFiAgent::randomPermutation()
+{
+	for (unsigned i = 0; (int)i < max_num_scheduled_clients_; i++) {
+		uniform_int_distribution<int> randint(i, num_client_ - 1);
+		unsigned j = randint(rng);
+		swap(client_permutation_.at(i), client_permutation_.at(j));
+	}
+	//fprintf(stderr, "client_permutation_: [%d", client_permutation_.front());
+	//for (unsigned i = 1; i < num_client_; i++) {
+		//fprintf(stderr, ", %d", client_permutation_.at(i));
+	//}
+	//fprintf(stderr, "]\n");
+}
+
+// Once randomPermutation is done, the first max_num_scheduled_clients_
+// elements of client_permutation_ is the schedule.
+void SWiFiAgent::scheduleSelectively()
+{
+	if (!is_server_) {
+		return;
+	}
+	if ((int)num_scheduled_clients_ >= max_num_scheduled_clients_) {
+		target_ = NULL;
+	} else {
+		unsigned idx = client_permutation_.at(num_scheduled_clients_);
+		target_ = client_list_.at(idx);
+		num_scheduled_clients_++;
 	}
 }
 
