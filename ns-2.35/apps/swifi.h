@@ -36,6 +36,8 @@ enum swifi_pkt_t {
 	SWiFi_PKT_POLL_DATA = 10, // poll data packet transmission in uplink
 	SWiFi_PKT_NUM_UL,  // packet in uplink that carrys num of pkts at client
 	SWiFi_PKT_DATA_UL, // data packet in uplink (client to server)
+	SWiFi_PKT_POLL_PGBK, // poll data packet with piggybacked queue length 
+	SWiFi_PKT_PGBK_UL, // data packet with piggybacked queue length information in uplink
 };
 
 enum swifi_poll_state {
@@ -140,6 +142,7 @@ protected:
 	// Whether to retry the same client if no response (user configurable)
 	int retry_;
 	int realtime_;  // Whether the traffic is realtime
+	int piggyback_; // Whether the piggyback function is enabled
 
 	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
 	// Schedule uplink data packet transmission with Max Weight policy

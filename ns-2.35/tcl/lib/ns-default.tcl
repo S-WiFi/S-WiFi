@@ -1598,3 +1598,4 @@ Agent/SWiFi set do_poll_num_ true
 Agent/SWiFi set pcf_policy_ 0
 Agent/SWiFi set retry_ true
 Agent/SWiFi set realtime_ true
+Agent/SWiFi set piggyback_ true
