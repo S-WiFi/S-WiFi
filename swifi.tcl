@@ -127,25 +127,37 @@ if {0 == [string compare $func "pcf"]} {
 set interval 10
 puts "interval: $interval, number of nodes: $val(nn)"
 
-# Set to 0 for asymmetric channel reliabilities.
-set symmetric_channel 1
-
 if {0 == [string compare $func "pcf"]} {
-	if {0 != $symmetric_channel} {
-		for {set i 1} {$i < $val(nn)} {incr i} {
-			# Change distance value for different reliabilities.
-			if {$argc < 3} {
-				set distance([expr $i - 1]) 1000
-			} else {
-				set distance([expr $i - 1]) [lindex $argv 2]
+	if {$argc < 3} {
+		set dist 1000
+	} else {
+		set dist [lindex $argv 2]
+	}
+	if {$argc < 4} {
+		set symmetry "sym"
+	} else {
+		set symmetry [lindex $argv 3]
+	}
+	switch -glob -nocase $symmetry {
+		s* {
+			set symmetry "sym"
+			for {set i 1} {$i < $val(nn)} {incr i} {
+				set distance([expr $i - 1]) $dist
 			}
 		}
-	} else {
-		for {set i 1} {$i <= 2} {incr i} {
-			set distance([expr $i - 1]) 1
+		a* {
+			set symmetry "asym"
+			# Asymmetric channel: put the first two clients near
+			# the AP and the others of the same distance.
+			for {set i 1} {$i <= 2} {incr i} {
+				set distance([expr $i - 1]) 1
+			}
+			for {set i 3} {$i < $val(nn)} {incr i} {
+				set distance([expr $i - 1]) $dist
+			}
 		}
-		for {set i 3} {$i < $val(nn)} {incr i} {
-			set distance([expr $i - 1]) 1000
+		default {
+			usage
 		}
 	}
 } elseif {0 == [string compare $func "delay"]} {
@@ -228,7 +240,11 @@ Agent/SWiFi set realtime_ true
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
-set datfname [format "swifi_%s_%s.dat" $func $mode]
+if {0 == [string compare $func "pcf"]} {
+	set datfname [format "swifi_%s_%s_%s.dat" $func $symmetry $mode]
+} else {
+	set datfname [format "swifi_%s_%s.dat" $func $mode]
+}
 set datf [open $datfname w]
 set logqname [format "swifi_%s_%s_queue.log" $func $mode]
 set logq [open $logqname w]
