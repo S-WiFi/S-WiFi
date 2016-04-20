@@ -39,7 +39,7 @@ proc usage {} {
 	global argv0
 	puts "$argv0 func mode"
 	puts "    func    One of pcf (default), rtt, reliability, and delay"
-	puts "    mode    One of baseline or smart (default) if func is pcf;"
+	puts "    mode    One of baseline or smart (default) or number if func is pcf;"
 	puts "            one of downlink (default) or uplink otherwise"
 	exit 0
 }
@@ -89,17 +89,16 @@ switch -glob -nocase $mode {
 	s* {
 		set mode "smart"
 	}
+	[0-9]* {
+		# Do nothing.
+	}
 	default {
 		usage
 	}
 }
 if {0 == [string compare $func "pcf"]} {
-	if {0 == [string compare $mode "baseline"] || 0 == [string compare $mode "smart"]} {
-		# Disable retry in MAC layer.
-		set retry 0
-	} else {
-		usage
-	}
+	# Disable retry in MAC layer.
+	set retry 0
 } else  {
 	  if {0 == [string compare $mode "uplink"] || 0 == [string compare $mode "downlink"]} {
 		if {0 == [string compare $func "delay"]} {
@@ -240,41 +239,57 @@ foreach {fullmatch m1 m2} [regexp -all -line -inline $pattern $lutfile] {
 	set lut($m1) $m2
 }
 
-# Determine the number of selected clients for selective scheduling.
-set reliability [list]
-for {set i 1} {$i < $val(nn) } {incr i} {
-	lappend reliability $lut([expr abs($distance([expr $i - 1]))])
-}
-set num_clients [expr $val(nn) - 1]
-set reliability_sorted [lsort -real -decreasing $reliability]
-set num_select 1
-set max_throughput_est 0.0 ;# It will be overriden by the correct value.
-for {set k 1} {$k <= $num_clients} {incr k} {
-	# Calculate the estimated total throughput
-	# for the k clients with largest channel reliabilities.
-	set cum_reliability 0.0
-	set cum_inverse 0.0
-	for {set i 0} { $i < $k } {incr i} {
-		set cum_reliability [expr $cum_reliability + [lindex $reliability_sorted $i]]
-		set cum_inverse [expr $cum_inverse + 1.0 / [lindex $reliability $i]]
+if {0 == [string compare $func "pcf"]} {
+	if {0 == [string compare $mode "smart"]} {
+		set modenum 7
+	} elseif {0 == [string compare $mode "baseline"]} {
+		set modenum 0
+	} else {
+		set modenum $mode
 	}
-	set data_slots [expr max(0, $interval - $cum_inverse)]
-	set th [expr min($k, [expr $data_slots * $cum_reliability / $k])]
-	if {$th > $max_throughput_est} {
-		set num_select $k
-		set max_throughput_est $th
+	set selective [expr $modenum & 1]
+	set piggyback [expr $modenum & 2]
+	puts "selective=$selective, piggyback=$piggyback"
+	Agent/SWiFi set pcf_policy_ $modenum
+
+	# Determine the number of selected clients for selective scheduling.
+	set reliability [list]
+	for {set i 1} {$i < $val(nn) } {incr i} {
+		lappend reliability $lut([expr abs($distance([expr $i - 1]))])
 	}
-}
-if {0 == [string compare $mode "smart"]} {
-	puts "num_select: $num_select"
-	Agent/SWiFi set num_select_ $num_select
+	set num_clients [expr $val(nn) - 1]
+	set reliability_sorted [lsort -real -decreasing $reliability]
+	set num_select 1
+	set max_throughput_est 0.0 ;# It will be overriden by the correct value.
+	for {set k 1} {$k <= $num_clients} {incr k} {
+		# Calculate the estimated total throughput
+		# for the k clients with largest channel reliabilities.
+		set cum_reliability 0.0
+		set cum_inverse 0.0
+		for {set i 0} { $i < $k } {incr i} {
+			set cum_reliability [expr $cum_reliability + [lindex $reliability_sorted $i]]
+			set cum_inverse [expr $cum_inverse + 1.0 / [lindex $reliability $i]]
+		}
+		if {$piggyback} {
+			set data_slots $interval
+		} else {
+			set data_slots [expr max(0, $interval - $cum_inverse)]
+		}
+		set th [expr min($k, [expr $data_slots * $cum_reliability / $k])]
+		# Add a small guard amount to avoid variance of floating point computation.
+		if {$th > [expr $max_throughput_est + 1e-3]} {
+			set num_select $k
+			set max_throughput_est $th
+		}
+	}
+	if {$selective} {
+		puts "num_select: $num_select"
+		Agent/SWiFi set num_select_ $num_select
+	}
 }
 
 Agent/SWiFi set packet_size_ 1000
 #Agent/SWiFi set slot_interval_ 0.01
-if {0 == [string compare $mode "smart"]} {
-	Agent/SWiFi set pcf_policy_ 7
-}
 Agent/SWiFi set realtime_ true
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
