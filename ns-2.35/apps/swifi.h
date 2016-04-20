@@ -160,7 +160,7 @@ protected:
 	// Whether to retry the same client if no response (user configurable)
 	int retry_;
 	int realtime_;  // Whether the traffic is realtime
-	int piggyback_; // Whether the piggyback function is enabled
+	bool piggyback_; // Whether the piggyback function is enabled
 
 	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
 	// Schedule uplink data packet transmission with Max Weight policy
