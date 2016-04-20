@@ -273,7 +273,7 @@ if {0 == [string compare $mode "smart"]} {
 Agent/SWiFi set packet_size_ 1000
 #Agent/SWiFi set slot_interval_ 0.01
 if {0 == [string compare $mode "smart"]} {
-	Agent/SWiFi set pcf_policy_ 1
+	Agent/SWiFi set pcf_policy_ 7
 }
 Agent/SWiFi set realtime_ true
 
