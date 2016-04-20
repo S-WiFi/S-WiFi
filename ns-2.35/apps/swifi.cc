@@ -270,9 +270,12 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 					hdr->ret_ = SWiFi_PKT_POLL_PGBK; // It's a POLL_PGBK packet
 				} else {
 					hdr->ret_ = SWiFi_PKT_POLL_NUM; // It's a POLL_NUM packet
+				}
 				// If no retry, send out POLL_NUM once and
 				// go to POLL_DATA.
-				if (!retry_ && selective_ && ((int)num_scheduled_clients_ > num_select_)) {
+				if (!retry_ && selective_ &&
+					((int)num_scheduled_clients_ >
+					 num_select_)) {
 					poll_state_ = SWiFi_POLL_DATA;
 				}
 			} else if (poll_state_ == SWiFi_POLL_DATA) {
