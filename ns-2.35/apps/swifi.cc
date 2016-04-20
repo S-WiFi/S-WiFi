@@ -101,7 +101,7 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 		advance_ = true;
 	}
 	bind_bool("realtime_", &realtime_);
-	bind_bool("max_num_scheduled_clients_", &max_num_scheduled_clients_);
+	bind_bool("num_select_", &num_select_);
 	num_scheduled_clients_ = 0;
 
 	initRandomNumberGenerator();
@@ -265,10 +265,10 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			// Set packet type per state
 			if (poll_state_ == SWiFi_POLL_NUM) {
 				hdr->ret_ = SWiFi_PKT_POLL_NUM; // It's a POLL_NUM packet
-				// After the max_num_scheduled_clients_ clients
+				// After the num_select_ clients
 				// are scheduled, schedule the remaining clients
 				// greedily (only POLL_NUM once per client).
-				if (selective_ && ((int)num_scheduled_clients_ > max_num_scheduled_clients_)) {
+				if (selective_ && ((int)num_scheduled_clients_ > num_select_)) {
 					poll_state_ = SWiFi_POLL_DATA;
 
 				}
@@ -655,8 +655,8 @@ void SWiFiAgent::randomPermutation(unsigned k)
 	//fprintf(stderr, "]\n");
 }
 
-// Once randomPermutation is done, the first max_num_scheduled_clients_
-// elements of client_permutation_ is the schedule.
+// Once randomPermutation is done, the first num_select_
+// elements of client_permutation_ is the selective schedule.
 void SWiFiAgent::scheduleSelectively()
 {
 	if (!is_server_) {

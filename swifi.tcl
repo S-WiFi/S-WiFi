@@ -240,14 +240,14 @@ foreach {fullmatch m1 m2} [regexp -all -line -inline $pattern $lutfile] {
 	set lut($m1) $m2
 }
 
-# Determine max_num_scheduled_clients
+# Determine the number of selected clients for selective scheduling.
 set reliability [list]
 for {set i 1} {$i < $val(nn) } {incr i} {
 	lappend reliability $lut([expr abs($distance([expr $i - 1]))])
 }
 set num_clients [expr $val(nn) - 1]
 set reliability_sorted [lsort -real -decreasing $reliability]
-set max_num_scheduled_clients 1
+set num_select 1
 set max_throughput_est 0.0 ;# It will be overriden by the correct value.
 for {set k 1} {$k <= $num_clients} {incr k} {
 	# Calculate the estimated total throughput
@@ -261,12 +261,14 @@ for {set k 1} {$k <= $num_clients} {incr k} {
 	set data_slots [expr max(0, $interval - $cum_inverse)]
 	set th [expr min($k, [expr $data_slots * $cum_reliability / $k])]
 	if {$th > $max_throughput_est} {
-		set max_num_scheduled_clients $k
+		set num_select $k
 		set max_throughput_est $th
 	}
 }
-puts "max_num_scheduled_clients: $max_num_scheduled_clients"
-Agent/SWiFi set max_num_scheduled_clients_ $max_num_scheduled_clients
+if {0 == [string compare $mode "smart"]} {
+	puts "num_select: $num_select"
+	Agent/SWiFi set num_select_ $num_select
+}
 
 Agent/SWiFi set packet_size_ 1000
 #Agent/SWiFi set slot_interval_ 0.01

@@ -142,7 +142,10 @@ protected:
 	// Used by server only
 	swifi_poll_state poll_state_; // Indicate the state of polling (used by server AP)
 	bool advance_;  // Whether to advance to the next client in scheduling
-	int max_num_scheduled_clients_;
+	// Number of clients for selective scheduling.
+	// The remaining clients will be scheduled only after all packets of
+	// the selected clients are delivered.
+	int num_select_;
 	// Count how many clients have been scheduled in current interval.
 	unsigned num_scheduled_clients_;
 	vector<int> client_permutation_;
