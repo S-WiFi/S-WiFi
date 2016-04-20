@@ -92,6 +92,8 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	bind("slot_interval_", &slot_interval_);
 	bind_bool("do_poll_num_", &do_poll_num_);
 	bind("pcf_policy_", &pcf_policy_);
+	// Configure pcf features according to the bits of pcf_policy_.
+	selective_ = ((pcf_policy_ & SWIFI_PCF_SELECTIVE) != 0);
 	bind_bool("retry_", &retry_);
 	if (retry_) {
 		advance_ = false;
@@ -229,9 +231,9 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				return (TCL_ERROR);
 			}
 			if (poll_state_ == SWiFi_POLL_NUM) {
-				if (pcf_policy_ == SWiFi_PCF_BASELINE) {
+				if (!selective_) {
 					scheduleRoundRobin(false);
-				} else if (pcf_policy_ == SWiFi_PCF_SMART) {
+				} else {
 					scheduleSelectively();
 				}
 				if (!target_) {
@@ -296,16 +298,18 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 						client_list_.at(i)->queue_length_ = 0;
 					}
 				}
-				num_scheduled_clients_ = 0;
-				// initPermutation can be done only after all
-				// cliens register.
-				// It is only necessary at the first interval.
-				// Re-run it at each interval might have a small
-				// performance loss,
-				// but the good thing is that
-				// we do not need yet another tcl command.
-				initPermutation();
-				randomPermutation();
+				if (selective_) {
+					num_scheduled_clients_ = 0;
+					// initPermutation can be done only after all
+					// cliens register.
+					// It is only necessary at the first interval.
+					// Re-run it at each interval might have a small
+					// performance loss,
+					// but the good thing is that
+					// we do not need yet another tcl command.
+					initPermutation();
+					randomPermutation();
+				}
 			}
 			return (TCL_OK);
 		}

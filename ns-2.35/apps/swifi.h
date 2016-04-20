@@ -51,8 +51,11 @@ enum swifi_poll_state {
 	SWiFi_POLL_IDLE,
 };
 
-#define	SWiFi_PCF_BASELINE 0
-#define	SWiFi_PCF_SMART    1
+enum swifi_pcf_feature {
+	SWIFI_PCF_SELECTIVE = 1,
+	SWIFI_PCF_PGBK = 2,
+	SWIFI_PCF_RETRY = 4,
+};
 
 struct hdr_swifi {
 	char ret_;
@@ -148,6 +151,7 @@ protected:
 	// Scheduling parameters
 	int do_poll_num_;      // Whether to send POLL_NUM before POLL_DATA
 	int pcf_policy_; // PCF policy: baseline/smart
+	bool selective_; // Whether to enable selective scheduling
 	// Whether to retry the same client if no response (user configurable)
 	int retry_;
 	int realtime_;  // Whether the traffic is realtime
