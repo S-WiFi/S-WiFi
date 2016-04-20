@@ -119,6 +119,58 @@ if {0 == [string compare $func "pcf"]} {
 
 puts "func: $func, mode: $mode"
 
+if {0 == [string compare $func "pcf"]} {
+	set val(nn)             6          ;# number of mobilenodes
+} else {
+	set val(nn)             2          ;# number of mobilenodes
+}
+set interval 10
+puts "interval: $interval, number of nodes: $val(nn)"
+
+if {0 == [string compare $func "pcf"]} {
+	if {$argc < 3} {
+		set dist 1000
+	} else {
+		set dist [lindex $argv 2]
+	}
+	if {$argc < 4} {
+		set symmetry "sym"
+	} else {
+		set symmetry [lindex $argv 3]
+	}
+	switch -glob -nocase $symmetry {
+		s* {
+			set symmetry "sym"
+			for {set i 1} {$i < $val(nn)} {incr i} {
+				set distance([expr $i - 1]) $dist
+			}
+		}
+		a* {
+			set symmetry "asym"
+			# Asymmetric channel: put the first two clients near
+			# the AP and the others of the same distance.
+			for {set i 1} {$i <= 2} {incr i} {
+				set distance([expr $i - 1]) 1
+			}
+			for {set i 3} {$i < $val(nn)} {incr i} {
+				set distance([expr $i - 1]) $dist
+			}
+		}
+		default {
+			usage
+		}
+	}
+} elseif {0 == [string compare $func "delay"]} {
+	# Set the distance that the reliability is >= 55% per Problem 3.
+	set distance(0) 1000
+} else {
+	set distance(0) 1
+}
+for {set i 1} {$i < $val(nn)} {incr i} {
+	puts "distance of node $i: $distance([expr $i - 1])"
+}
+
+
 # ======================================================================
 # Define options
 # ======================================================================
@@ -132,14 +184,6 @@ set val(ll)             LL                         ;# link layer type
 set val(ant)            Antenna/OmniAntenna        ;# antenna model
 set val(ifqlen)         50                         ;# max packet in ifq
 set val(rp)             DumbAgent                  ;# routing protocol
-if {0 == [string compare $func "pcf"]} {
-	set val(nn)             6          ;# number of mobilenodes
-} else {
-	set val(nn)             2          ;# number of mobilenodes
-}
-
-set interval 10
-puts "interval: $interval, number of nodes: $val(nn)"
 
 # ======================================================================
 # Main Program
@@ -196,7 +240,11 @@ Agent/SWiFi set realtime_ true
 
 set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
-set datfname [format "swifi_%s_%s.dat" $func $mode]
+if {0 == [string compare $func "pcf"]} {
+	set datfname [format "swifi_%s_%s_%s.dat" $func $symmetry $mode]
+} else {
+	set datfname [format "swifi_%s_%s.dat" $func $mode]
+}
 set datf [open $datfname w]
 set logqname [format "swifi_%s_%s_queue.log" $func $mode]
 set logq [open $logqname w]
@@ -281,33 +329,6 @@ $node_(0) set Y_ 100
 $node_(0) set Z_ 0
 set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
-
-# Set to 0 for asymmetric channel reliabilities.
-set symmetric_channel 1
-
-if {0 == [string compare $func "pcf"]} {
-	if {0 != $symmetric_channel} {
-		for {set i 1} {$i < $val(nn)} {incr i} {
-			# Change distance value for different reliabilities.
-			set distance([expr $i - 1]) 1000
-		}
-	} else {
-		for {set i 1} {$i <= 2} {incr i} {
-			set distance([expr $i - 1]) 1
-		}
-		for {set i 3} {$i < $val(nn)} {incr i} {
-			set distance([expr $i - 1]) 1000
-		}
-	}
-} elseif {0 == [string compare $func "delay"]} {
-	# Set the distance that the reliability is >= 55% per Problem 3.
-	set distance(0) 1000
-} else {
-	set distance(0) 1
-}
-for {set i 1} {$i < $val(nn)} {incr i} {
-	puts "distance of node $i: $distance([expr $i - 1])"
-}
 
 # Build a LUT of (distance, reliability).
 set lutfp [open "report/swifi_reliability_uplink.dat" r]
