@@ -249,9 +249,14 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				}
 			}
 			if (!target_) {
-				// No more clients to schedule. Idle.
-				poll_state_ = SWiFi_POLL_IDLE;
-				return (TCL_OK);
+				if (selective_ && (num_scheduled_clients_ < num_client_)) {
+					scheduleSelectively();
+					poll_state_ = SWiFi_POLL_NUM;
+				} else {
+					// No more clients to schedule. Idle.
+					poll_state_ = SWiFi_POLL_IDLE;
+					return (TCL_OK);
+				}
 			}
 			// Create a new packet
 			Packet* pkt = allocpkt();
@@ -260,6 +265,13 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			// Set packet type per state
 			if (poll_state_ == SWiFi_POLL_NUM) {
 				hdr->ret_ = SWiFi_PKT_POLL_NUM; // It's a POLL_NUM packet
+				// After the max_num_scheduled_clients_ clients
+				// are scheduled, schedule the remaining clients
+				// greedily (only POLL_NUM once per client).
+				if (selective_ && ((int)num_scheduled_clients_ > max_num_scheduled_clients_)) {
+					poll_state_ = SWiFi_POLL_DATA;
+
+				}
 			} else if (poll_state_ == SWiFi_POLL_DATA) {
 				hdr->ret_ = SWiFi_PKT_POLL_DATA; // It's a POLL_DATA packet
 			} else {
@@ -308,7 +320,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 					// but the good thing is that
 					// we do not need yet another tcl command.
 					initPermutation();
-					randomPermutation();
+					randomPermutation(num_client_);
 				}
 			}
 			return (TCL_OK);
@@ -624,9 +636,14 @@ void SWiFiAgent::initRandomNumberGenerator()
 	rng.seed(rd());
 }
 
-void SWiFiAgent::randomPermutation()
+// Random k-permutation
+void SWiFiAgent::randomPermutation(unsigned k)
 {
-	for (unsigned i = 0; (int)i < max_num_scheduled_clients_; i++) {
+	if (k > num_client_) {
+		fprintf(stderr, "randomPermutation: k should be at most num_client_\n");
+		exit(1);
+	}
+	for (unsigned i = 0; i < k; i++) {
 		uniform_int_distribution<int> randint(i, num_client_ - 1);
 		unsigned j = randint(rng);
 		swap(client_permutation_.at(i), client_permutation_.at(j));
@@ -645,7 +662,7 @@ void SWiFiAgent::scheduleSelectively()
 	if (!is_server_) {
 		return;
 	}
-	if ((int)num_scheduled_clients_ >= max_num_scheduled_clients_) {
+	if (num_scheduled_clients_ >= num_client_) {
 		target_ = NULL;
 	} else {
 		unsigned idx = client_permutation_.at(num_scheduled_clients_);

@@ -163,7 +163,7 @@ protected:
 	void scheduleSelectively();
 
 	void initPermutation();
-	void randomPermutation();
+	void randomPermutation(unsigned k);
 	void initRandomNumberGenerator();
 };
 
