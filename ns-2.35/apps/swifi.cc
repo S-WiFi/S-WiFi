@@ -250,6 +250,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			}
 			if (!target_) {
 				if (selective_ && (num_scheduled_clients_ < num_client_)) {
+					//fprintf(stderr, "Let's be work conserving!\n");
 					scheduleSelectively();
 					poll_state_ = SWiFi_POLL_NUM;
 				} else {
@@ -265,12 +266,10 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			// Set packet type per state
 			if (poll_state_ == SWiFi_POLL_NUM) {
 				hdr->ret_ = SWiFi_PKT_POLL_NUM; // It's a POLL_NUM packet
-				// After the num_select_ clients
-				// are scheduled, schedule the remaining clients
-				// greedily (only POLL_NUM once per client).
-				if (selective_ && ((int)num_scheduled_clients_ > num_select_)) {
+				// If no retry, send out POLL_NUM once and
+				// go to POLL_DATA.
+				if (!retry_ && selective_ && ((int)num_scheduled_clients_ > num_select_)) {
 					poll_state_ = SWiFi_POLL_DATA;
-
 				}
 			} else if (poll_state_ == SWiFi_POLL_DATA) {
 				hdr->ret_ = SWiFi_PKT_POLL_DATA; // It's a POLL_DATA packet
@@ -573,6 +572,14 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			//fprintf(stderr, "Received uplink num packet: src addr=%d, dest addr=%d, num=%d\n", hdrip->saddr(), hdrip->daddr(), hdr->num_data_pkt_);
 			if (retry_) {
 				advance_ = true;
+				num_scheduled_clients_++;
+				// If we receive the POLL_NUM reply from a
+				// remaining client, serve it before POLL_NUM
+				// other remaining clients.
+				if (selective_ && ((int)num_scheduled_clients_ >= num_select_)) {
+					poll_state_ = SWiFi_POLL_DATA;
+
+				}
 			}
 			// The current queue length is equal to
 			// the number of data packets generated minus
@@ -667,7 +674,9 @@ void SWiFiAgent::scheduleSelectively()
 	} else {
 		unsigned idx = client_permutation_.at(num_scheduled_clients_);
 		target_ = client_list_.at(idx);
-		num_scheduled_clients_++;
+		if (!retry_) {
+			num_scheduled_clients_++;
+		}
 	}
 }
 
