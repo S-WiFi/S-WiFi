@@ -92,6 +92,8 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	bind("slot_interval_", &slot_interval_);
 	bind_bool("do_poll_num_", &do_poll_num_);
 	bind("pcf_policy_", &pcf_policy_);
+	// Configure pcf features according to the bits of pcf_policy_.
+	selective_ = ((pcf_policy_ & SWIFI_PCF_SELECTIVE) != 0);
 	bind_bool("retry_", &retry_);
 	if (retry_) {
 		advance_ = false;
@@ -99,6 +101,10 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 		advance_ = true;
 	}
 	bind_bool("realtime_", &realtime_);
+	bind_bool("num_select_", &num_select_);
+	num_scheduled_clients_ = 0;
+
+	initRandomNumberGenerator();
 }
 
 SWiFiAgent::~SWiFiAgent()
@@ -225,11 +231,10 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				return (TCL_ERROR);
 			}
 			if (poll_state_ == SWiFi_POLL_NUM) {
-				if (pcf_policy_ == SWiFi_PCF_BASELINE) {
+				if (!selective_) {
 					scheduleRoundRobin(false);
-				} else if (pcf_policy_ == SWiFi_PCF_SMART) {
-					//FIXME
-					scheduleRoundRobin(false);
+				} else {
+					scheduleSelectively();
 				}
 				if (!target_) {
 					// No more clients to poll num. Poll data.
@@ -244,9 +249,15 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				}
 			}
 			if (!target_) {
-				// No more clients to schedule. Idle.
-				poll_state_ = SWiFi_POLL_IDLE;
-				return (TCL_OK);
+				if (selective_ && (num_scheduled_clients_ < num_client_)) {
+					//fprintf(stderr, "Let's be work conserving!\n");
+					scheduleSelectively();
+					poll_state_ = SWiFi_POLL_NUM;
+				} else {
+					// No more clients to schedule. Idle.
+					poll_state_ = SWiFi_POLL_IDLE;
+					return (TCL_OK);
+				}
 			}
 			// Create a new packet
 			Packet* pkt = allocpkt();
@@ -255,6 +266,11 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			// Set packet type per state
 			if (poll_state_ == SWiFi_POLL_NUM) {
 				hdr->ret_ = SWiFi_PKT_POLL_NUM; // It's a POLL_NUM packet
+				// If no retry, send out POLL_NUM once and
+				// go to POLL_DATA.
+				if (!retry_ && selective_ && ((int)num_scheduled_clients_ > num_select_)) {
+					poll_state_ = SWiFi_POLL_DATA;
+				}
 			} else if (poll_state_ == SWiFi_POLL_DATA) {
 				hdr->ret_ = SWiFi_PKT_POLL_DATA; // It's a POLL_DATA packet
 			} else {
@@ -292,6 +308,18 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 						client_list_.at(i)->exp_pkt_id_ = 0;
 						client_list_.at(i)->queue_length_ = 0;
 					}
+				}
+				if (selective_) {
+					num_scheduled_clients_ = 0;
+					// initPermutation can be done only after all
+					// cliens register.
+					// It is only necessary at the first interval.
+					// Re-run it at each interval might have a small
+					// performance loss,
+					// but the good thing is that
+					// we do not need yet another tcl command.
+					initPermutation();
+					randomPermutation(num_client_);
 				}
 			}
 			return (TCL_OK);
@@ -544,6 +572,14 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			//fprintf(stderr, "Received uplink num packet: src addr=%d, dest addr=%d, num=%d\n", hdrip->saddr(), hdrip->daddr(), hdr->num_data_pkt_);
 			if (retry_) {
 				advance_ = true;
+				num_scheduled_clients_++;
+				// If we receive the POLL_NUM reply from a
+				// remaining client, serve it before POLL_NUM
+				// other remaining clients.
+				if (selective_ && ((int)num_scheduled_clients_ >= num_select_)) {
+					poll_state_ = SWiFi_POLL_DATA;
+
+				}
 			}
 			// The current queue length is equal to
 			// the number of data packets generated minus
@@ -589,6 +625,57 @@ void SWiFiAgent::scheduleRoundRobin(bool loop)
 				}
 				return;
 			}
+		}
+	}
+}
+
+void SWiFiAgent::initPermutation()
+{
+	client_permutation_.clear();
+	for (unsigned i = 0; i < num_client_; i++) {
+		client_permutation_.push_back(i);
+	}
+}
+
+void SWiFiAgent::initRandomNumberGenerator()
+{
+	random_device rd;
+	rng.seed(rd());
+}
+
+// Random k-permutation
+void SWiFiAgent::randomPermutation(unsigned k)
+{
+	if (k > num_client_) {
+		fprintf(stderr, "randomPermutation: k should be at most num_client_\n");
+		exit(1);
+	}
+	for (unsigned i = 0; i < k; i++) {
+		uniform_int_distribution<int> randint(i, num_client_ - 1);
+		unsigned j = randint(rng);
+		swap(client_permutation_.at(i), client_permutation_.at(j));
+	}
+	//fprintf(stderr, "client_permutation_: [%d", client_permutation_.front());
+	//for (unsigned i = 1; i < num_client_; i++) {
+		//fprintf(stderr, ", %d", client_permutation_.at(i));
+	//}
+	//fprintf(stderr, "]\n");
+}
+
+// Once randomPermutation is done, the first num_select_
+// elements of client_permutation_ is the selective schedule.
+void SWiFiAgent::scheduleSelectively()
+{
+	if (!is_server_) {
+		return;
+	}
+	if (num_scheduled_clients_ >= num_client_) {
+		target_ = NULL;
+	} else {
+		unsigned idx = client_permutation_.at(num_scheduled_clients_);
+		target_ = client_list_.at(idx);
+		if (!retry_) {
+			num_scheduled_clients_++;
 		}
 	}
 }

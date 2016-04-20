@@ -21,12 +21,18 @@
 #include <sstream>
 #include <string>
 #include <algorithm> //for min
+#include <random>
+#include <utility>
 using std::vector;
 using std::endl;
 using std::ofstream;
 using std::ostringstream;
 using std::string;
 using std::min;
+using std::random_device;
+using std::mt19937;
+using std::uniform_int_distribution;
+using std::swap;
 
 #define AP_IP 0 // It has to be 0 for ARP to find the AP correctly.
 #define TOL 1e-3
@@ -45,8 +51,11 @@ enum swifi_poll_state {
 	SWiFi_POLL_IDLE,
 };
 
-#define	SWiFi_PCF_BASELINE 0
-#define	SWiFi_PCF_SMART    1
+enum swifi_pcf_feature {
+	SWIFI_PCF_SELECTIVE = 1,
+	SWIFI_PCF_PGBK = 2,
+	SWIFI_PCF_RETRY = 4,
+};
 
 struct hdr_swifi {
 	char ret_;
@@ -133,10 +142,19 @@ protected:
 	// Used by server only
 	swifi_poll_state poll_state_; // Indicate the state of polling (used by server AP)
 	bool advance_;  // Whether to advance to the next client in scheduling
+	// Number of clients for selective scheduling.
+	// The remaining clients will be scheduled only after all packets of
+	// the selected clients are delivered.
+	int num_select_;
+	// Count how many clients have been scheduled in current interval.
+	unsigned num_scheduled_clients_;
+	vector<int> client_permutation_;
+	mt19937 rng;
 
 	// Scheduling parameters
 	int do_poll_num_;      // Whether to send POLL_NUM before POLL_DATA
 	int pcf_policy_; // PCF policy: baseline/smart
+	bool selective_; // Whether to enable selective scheduling
 	// Whether to retry the same client if no response (user configurable)
 	int retry_;
 	int realtime_;  // Whether the traffic is realtime
@@ -144,6 +162,12 @@ protected:
 	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
 	// Schedule uplink data packet transmission with Max Weight policy
 	void scheduleMaxWeight();
+	// Schedule only a subset of all registered clients selectively.
+	void scheduleSelectively();
+
+	void initPermutation();
+	void randomPermutation(unsigned k);
+	void initRandomNumberGenerator();
 };
 
 #endif //  NS_SWIFI_H

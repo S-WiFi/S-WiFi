@@ -231,6 +231,45 @@ Mac/802_11 set ShortRetryLimit_  [expr $retry + 1]    ;# retransmittions
 Mac/802_11 set LongRetryLimit_   [expr $retry + 1]    ;# retransmissions
 Mac/802_11 set TxFeedback_ 0;
 
+# Build a LUT of (distance, reliability).
+set lutfp [open "report/swifi_reliability_uplink.dat" r]
+set lutfile [read $lutfp]
+close $lutfp
+set pattern {([\.0-9]+)\s+([\.0-9]+)}
+foreach {fullmatch m1 m2} [regexp -all -line -inline $pattern $lutfile] {
+	set lut($m1) $m2
+}
+
+# Determine the number of selected clients for selective scheduling.
+set reliability [list]
+for {set i 1} {$i < $val(nn) } {incr i} {
+	lappend reliability $lut([expr abs($distance([expr $i - 1]))])
+}
+set num_clients [expr $val(nn) - 1]
+set reliability_sorted [lsort -real -decreasing $reliability]
+set num_select 1
+set max_throughput_est 0.0 ;# It will be overriden by the correct value.
+for {set k 1} {$k <= $num_clients} {incr k} {
+	# Calculate the estimated total throughput
+	# for the k clients with largest channel reliabilities.
+	set cum_reliability 0.0
+	set cum_inverse 0.0
+	for {set i 0} { $i < $k } {incr i} {
+		set cum_reliability [expr $cum_reliability + [lindex $reliability_sorted $i]]
+		set cum_inverse [expr $cum_inverse + 1.0 / [lindex $reliability $i]]
+	}
+	set data_slots [expr max(0, $interval - $cum_inverse)]
+	set th [expr min($k, [expr $data_slots * $cum_reliability / $k])]
+	if {$th > $max_throughput_est} {
+		set num_select $k
+		set max_throughput_est $th
+	}
+}
+if {0 == [string compare $mode "smart"]} {
+	puts "num_select: $num_select"
+	Agent/SWiFi set num_select_ $num_select
+}
+
 Agent/SWiFi set packet_size_ 1000
 #Agent/SWiFi set slot_interval_ 0.01
 if {0 == [string compare $mode "smart"]} {
@@ -272,12 +311,12 @@ Agent/SWiFi instproc recv {from rtt data} {
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
-	global n_rx num_slots distance reliability datf interval func
-	set reliability($n_run) [expr double($n_rx) * $interval / $num_slots]
+	global n_rx num_slots distance datf interval func
+	set throughput [expr double($n_rx) * $interval / $num_slots]
 	if {0 == [string compare $func "pcf"]} {
-		puts $datf "$reliability($n_run)"
+		puts $datf "$throughput"
 	} else {
-		puts $datf "$distance($n_run) $reliability($n_run)"
+		puts $datf "$distance($n_run) $throughput"
 	}
 	flush $datf
 	set n_rx 0
@@ -330,15 +369,6 @@ $node_(0) set Z_ 0
 set sw_(0) [new Agent/SWiFi]
 $ns_ attach-agent $node_(0) $sw_(0)
 
-# Build a LUT of (distance, reliability).
-set lutfp [open "report/swifi_reliability_uplink.dat" r]
-set lutfile [read $lutfp]
-close $lutfp
-set pattern {([\.0-9]+)\s+([\.0-9]+)}
-foreach {fullmatch m1 m2} [regexp -all -line -inline $pattern $lutfile] {
-	set lut($m1) $m2
-}
-
 for {set i 1} {$i < $val(nn) } {incr i} {
 	set node_($i) [$ns_ node]	
 	$node_($i) random-motion 0		;# disable random motion
@@ -360,7 +390,7 @@ $ns_ at 0.5 "$sw_(0) server"
 
 for {set i 1} {$i < $val(nn)} {incr i} {
 	$ns_ connect $sw_($i) $sw_(0)
-	set cmd "$sw_(0) register $i $lut([expr abs($distance([expr $i - 1]))])"
+	set cmd "$sw_(0) register $i [lindex $reliability [expr $i - 1]]"
 	#puts "register cmd: $cmd"
 	$ns_ at [expr 3.0 + 0.1*$i] $cmd
 }
