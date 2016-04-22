@@ -98,18 +98,18 @@ switch -glob -nocase $mode {
 }
 if {0 == [string compare $func "pcf"]} {
 	# Disable retry in MAC layer.
-	set retry 0
+	set retry_mac 0
 } else  {
 	  if {0 == [string compare $mode "uplink"] || 0 == [string compare $mode "downlink"]} {
 		if {0 == [string compare $func "delay"]} {
 			if {$argc < 3} {
-				set retry 1
+				set retry_mac 1
 			} else {
-				set retry [lindex $argv 2]
+				set retry_mac [lindex $argv 2]
 			}
 		}
 		else {
-			set retry 1
+			set retry_mac 1
 	  	}
 	  } else {
  		usage
@@ -226,8 +226,8 @@ Mac/802_11 set CWMax_         1
 Mac/802_11 set PreambleLength_  144                   ;# long preamble 
 Mac/802_11 set RTSThreshold_  5000
 Mac/802_11 set PLCPDataRate_  1.0e6                   ;# 1Mbps
-Mac/802_11 set ShortRetryLimit_  [expr $retry + 1]    ;# retransmittions
-Mac/802_11 set LongRetryLimit_   [expr $retry + 1]    ;# retransmissions
+Mac/802_11 set ShortRetryLimit_  [expr $retry_mac + 1]    ;# retransmittions
+Mac/802_11 set LongRetryLimit_   [expr $retry_mac + 1]    ;# retransmissions
 Mac/802_11 set TxFeedback_ 0;
 
 # Build a LUT of (distance, reliability).
@@ -249,8 +249,10 @@ if {0 == [string compare $func "pcf"]} {
 	}
 	set selective [expr $modenum & 1]
 	set piggyback [expr $modenum & 2]
-	puts "selective=$selective, piggyback=$piggyback"
+	set use_retry_limit [expr ($modenum & 4) ? 1 : 0]
+	puts "selective=$selective, piggyback=$piggyback, use_retry_limit=$use_retry_limit"
 	Agent/SWiFi set pcf_policy_ $modenum
+	Agent/SWiFi set use_retry_limit_ $use_retry_limit
 
 	# Determine the number of selected clients for selective scheduling.
 	set reliability [list]
@@ -260,22 +262,40 @@ if {0 == [string compare $func "pcf"]} {
 	set num_clients [expr $val(nn) - 1]
 	set reliability_sorted [lsort -real -decreasing $reliability]
 	set num_select 1
+	set retry_limit 1
 	set max_throughput_est 0.0 ;# It will be overriden by the correct value.
 	for {set k 1} {$k <= $num_clients} {incr k} {
 		# Calculate the estimated total throughput
 		# for the k clients with largest channel reliabilities.
 		set cum_reliability 0.0
-		set cum_inverse 0.0
+		# Estimated number of slots for POLL_NUM (may not be an integer)
+		set num_slots_num 0.0
 		for {set i 0} { $i < $k } {incr i} {
 			set cum_reliability [expr $cum_reliability + [lindex $reliability_sorted $i]]
-			set cum_inverse [expr $cum_inverse + 1.0 / [lindex $reliability $i]]
+			set p [lindex $reliability_sorted $i]
+			if {$use_retry_limit} {
+				set num_slots_num_k 0.0
+				set cum_prob 0.0
+				for {set j 1} {$j < $retry_limit} {incr j} {
+					set prob [expr pow(1 - $p, $j - 1) * $p]
+					set cum_prob [expr $cum_prob + $prob]
+					set num_slots_num_k_j [expr $j * $prob]
+					set num_slots_num_k [expr $num_slots_num_k + $num_slots_num_k_j]
+				}
+				set prob [expr 1 - $cum_prob]
+				set num_slots_num_k_j [expr ($retry_limit + 1) * $prob]
+				set num_slots_num_k [expr $num_slots_num_k + $num_slots_num_k_j]
+			} else {
+				set num_slots_num_k [expr 1.0 / [lindex $reliability_sorted $i]]
+			}
+			set num_slots_num [expr $num_slots_num + $num_slots_num_k]
 		}
 		if {$piggyback} {
-			set data_slots $interval
+			set num_slots_data $interval
 		} else {
-			set data_slots [expr max(0, $interval - $cum_inverse)]
+			set num_slots_data [expr max(0, $interval - $num_slots_num)]
 		}
-		set th [expr min($k, [expr $data_slots * $cum_reliability / $k])]
+		set th [expr min($k, [expr $num_slots_data * $cum_reliability / $k])]
 		# Add a small guard amount to avoid variance of floating point computation.
 		if {$th > [expr $max_throughput_est + 1e-3]} {
 			set num_select $k
@@ -285,6 +305,10 @@ if {0 == [string compare $func "pcf"]} {
 	if {$selective} {
 		puts "num_select: $num_select"
 		Agent/SWiFi set num_select_ $num_select
+	}
+	if {$use_retry_limit} {
+		puts "retry_limit: $retry_limit"
+		Agent/SWiFi set retry_limit_ $retry_limit
 	}
 }
 
@@ -305,7 +329,7 @@ set logq [open $logqname w]
 set loganame [format "swifi_%s_%s_arrival.log" $func $mode]
 set loga [open $loganame w]
 if {0 == [string compare $func "delay"]} {
-	set delayfname [format "swifi_%s_%s_%d.dat" $func $mode $retry]
+	set delayfname [format "swifi_%s_%s_%d.dat" $func $mode $retry_mac]
 	set delayf [open $delayfname w]
 }
 set n_rx 0

@@ -91,19 +91,17 @@ SWiFiAgent::SWiFiAgent() : Agent(PT_SWiFi), seq_(0), mac_(0)
 	bind("packet_size_", &size_);
 	bind("slot_interval_", &slot_interval_);
 	bind_bool("do_poll_num_", &do_poll_num_);
+	bind_bool("realtime_", &realtime_);
 	bind("pcf_policy_", &pcf_policy_);
 	// Configure pcf features according to the bits of pcf_policy_.
 	selective_ = ((pcf_policy_ & SWIFI_PCF_SELECTIVE) != 0);
 	piggyback_ = ((pcf_policy_ & SWIFI_PCF_PGBK) != 0);
-	bind_bool("retry_", &retry_);
-	if (retry_) {
-		advance_ = false;
-	} else {
-		advance_ = true;
-	}
-	bind_bool("realtime_", &realtime_);
+	bind_bool("use_retry_limit_", &use_retry_limit_);
 	bind_bool("num_select_", &num_select_);
 	num_scheduled_clients_ = 0;
+	bind("retry_limit_", &retry_limit_);
+	num_retry_ = 0;
+	advance_ = false;
 
 	initRandomNumberGenerator();
 }
@@ -125,11 +123,8 @@ void SWiFiAgent::restart()
 			client_list_.at(i)->queue_length_ = 0;
 		}
 		poll_state_ = SWiFi_POLL_NONE;
-		if (retry_) {
-			advance_ = false;
-		} else {
-			advance_ = true;
-		}
+		num_retry_ = 0;
+		advance_ = false;
 	} else {
 		num_data_pkt_ = 0;
 	}
@@ -148,11 +143,8 @@ void SWiFiAgent::reset()
 	num_data_pkt_ = 0;
 
 	poll_state_ = SWiFi_POLL_NONE;
-	if (retry_) {
-		advance_ = false;
-	} else {
-		advance_ = true;
-	}
+	num_retry_ = 0;
+	advance_ = false;
 }
 // ************************************************
 // Table of commands:
@@ -226,11 +218,20 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			return (TCL_OK);   
 		}
 		else if (strcmp(argv[1], "poll") == 0) {
+			//fprintf(stderr, "poll: +++++++++++++++++++++\n");
 			if (!is_server_) {
 				Tcl& tcl = Tcl::instance();
 				tcl.add_error("Only server AP can poll.");
 				return (TCL_ERROR);
 			}
+#if 0
+			if (num_scheduled_clients_ >= num_select_) {
+				fprintf(stderr, "poll: scheduling remaining clients\n");
+			} else {
+				fprintf(stderr, "poll: scheduling selected clients\n");
+			}
+			fprintf(stderr, "poll: state=%d\n", poll_state_);
+#endif
 			if (poll_state_ == SWiFi_POLL_NUM) {
 				if (!selective_) {
 					scheduleRoundRobin(false);
@@ -252,14 +253,18 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			if (!target_) {
 				if (selective_ && (num_scheduled_clients_ < num_client_)) {
 					//fprintf(stderr, "Let's be work conserving!\n");
+					// Reset num_retry_ for new scheduling.
+					num_retry_ = 0;
 					scheduleSelectively();
 					poll_state_ = SWiFi_POLL_NUM;
 				} else {
 					// No more clients to schedule. Idle.
+					//fprintf(stderr, "Idle!\n");
 					poll_state_ = SWiFi_POLL_IDLE;
 					return (TCL_OK);
 				}
 			}
+			//fprintf(stderr, "poll: target addr=%d\n", target_->addr_);
 			// Create a new packet
 			Packet* pkt = allocpkt();
 			// Access the header for the new packet:
@@ -271,12 +276,18 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 				} else {
 					hdr->ret_ = SWiFi_PKT_POLL_NUM; // It's a POLL_NUM packet
 				}
-				// If no retry, send out POLL_NUM once and
-				// go to POLL_DATA.
-				if (!retry_ && selective_ &&
-					((int)num_scheduled_clients_ >
+				// If we use retry limit and it has been reached,
+				// meanwhile the current scheduled client is
+				// the last one in selected or one of the
+				// remaining clients, we should go to POLL_DATA
+				// in the next interval.
+				if (use_retry_limit_ && advance_ &&
+					selective_ &&
+					((int)num_scheduled_clients_ >=
 					 num_select_)) {
+					//fprintf(stderr, "poll: go to SWiFi_POLL_DATA\n");
 					poll_state_ = SWiFi_POLL_DATA;
+					num_retry_ = 0;
 				}
 			} else if (poll_state_ == SWiFi_POLL_DATA) {
 				hdr->ret_ = SWiFi_PKT_POLL_DATA; // It's a POLL_DATA packet
@@ -297,6 +308,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 			//fprintf(stderr, "POLL: target addr=%d, exp_pkt_id_=%d, queue_length_=%d\n", target_->addr_, target_->exp_pkt_id_, target_->queue_length_);
 			// Send it out
 			send(pkt, 0);
+			//fprintf(stderr, "poll: ---------------------\n");
 			// return TCL_OK, so the calling function knows that
 			// the command has been processed
 			return (TCL_OK);
@@ -328,6 +340,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 					initPermutation();
 					randomPermutation(num_client_);
 				}
+				num_retry_ = 0;
 				advance_ = false;
 			}
 			return (TCL_OK);
@@ -424,6 +437,16 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 			target_->num_data_pkt_++;
 			//fprintf(stderr, "addr=%d, queue_length_=%d, exp_pkt_id_=%d, num_data_pkt_=%d\n",
 					//hdrip->saddr(), target_->queue_length_, target_->exp_pkt_id_, target_->num_data_pkt_);
+			if ((target_->queue_length_ <= 0) && selective_ && ((int)num_scheduled_clients_ >= num_select_)) {
+				// PGBK_UL or scheduleSelectively might already
+				// set advance_ to be true.
+				if (!advance_) {
+					num_retry_ = 0;
+					advance_ = true;
+					num_scheduled_clients_++;
+				}
+				poll_state_ = SWiFi_POLL_NUM;
+			}
 			PacketData* data = (PacketData*)pkt->userdata();
 			// Use tcl.eval to call the Tcl
 			// interpreter with the poll results.
@@ -628,15 +651,18 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	else if (hdr->ret_ == SWiFi_PKT_NUM_UL) {
 		if (is_server_) {
 			//fprintf(stderr, "Received uplink num packet: src addr=%d, dest addr=%d, num=%d\n", hdrip->saddr(), hdrip->daddr(), hdr->num_data_pkt_);
-			if (retry_) {
+			if (!use_retry_limit_ || !advance_) {
+				num_retry_ = 0;
 				advance_ = true;
 				num_scheduled_clients_++;
-				// If we receive the POLL_NUM reply from a
-				// remaining client, serve it before POLL_NUM
-				// other remaining clients.
-				if (selective_ && ((int)num_scheduled_clients_ >= num_select_)) {
-					poll_state_ = SWiFi_POLL_DATA;
-				}
+				//fprintf(stderr, "SWiFi_PKT_NUM_UL: num_scheduled_clients_++=%d\n", num_scheduled_clients_);
+			} else {
+				fprintf(stderr, "You have found a bug about num_retry_!\n");
+				exit(1);
+			}
+			if (selective_ && ((int)num_scheduled_clients_ >= num_select_)) {
+				poll_state_ = SWiFi_POLL_DATA;
+				num_retry_ = 0;
 			}
 			// The current queue length is equal to
 			// the number of data packets generated minus
@@ -661,22 +687,34 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 	// This is a SWiFi_PKT_PGBK_UL packet from client to server (UPLINK)
 	else if (hdr->ret_ == SWiFi_PKT_PGBK_UL) { //FIXME: Only work for real-time scenarios
 		if (is_server_) {
-			if (retry_) {
+			//fprintf(stderr, "Received SWiFi_PKT_PGBK_UL packet: src addr=%d, dest addr=%d, num=%d\n", hdrip->saddr(), hdrip->daddr(), hdr->num_data_pkt_);
+			if (!use_retry_limit_ || !advance_) {
+				// If advance_ has been set to true (by
+				// scheduleSelectively()), do not run this part
+				// again.
+				num_retry_ = 0;
 				advance_ = true;
 				num_scheduled_clients_++;
-				// If we receive the POLL_NUM reply from a
-				// remaining client, serve it before POLL_NUM
-				// other remaining clients.
-				if (selective_ && ((int)num_scheduled_clients_ >= num_select_)) {
-					poll_state_ = SWiFi_POLL_DATA;
-				}
+				//fprintf(stderr, "SWiFi_PKT_PGBK_UL: num_scheduled_clients_++=%d\n", num_scheduled_clients_);
+			} else if (use_retry_limit_ && (num_retry_ > retry_limit_)) {
+				fprintf(stderr, "You have found a bug about num_retry_!\n");
+				exit(1);
 			}
+			// If we receive the POLL_NUM reply from a remaining
+			// client or the last selected client, go to
+			// SWiFi_POLL_DATA in the next interval.
+			if (selective_ && ((int)num_scheduled_clients_ >= num_select_)) {
+				//fprintf(stderr, "SWiFi_PKT_PGBK_UL: go to SWiFi_POLL_DATA\n");
+				poll_state_ = SWiFi_POLL_DATA;
+				num_retry_ = 0;
+			}
+
 			// The current queue length is equal to
 			// the number of data packets generated minus
 			// the number of data packets received so far.
 			// For realtime traffic, num_data_pkt_ should be 0.
 			if (realtime_ && target_->num_data_pkt_ != 0) {
-				fprintf(stderr, "You have found a bug about num_data_pkt_!\n");
+				fprintf(stderr, "SWiFi_PKT_PGBK_UL: You have found a bug about num_data_pkt_!\n");
 				exit(1);
 			}
 			Tcl& tcl = Tcl::instance();
@@ -690,13 +728,16 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 					hdrip->src_.addr_ >> Address::instance().NodeShift_[1],
 					(Scheduler::instance().clock()-hdr->send_time_) * 1000,
 					data->data());
+				target_->num_data_pkt_ = 1;
 				target_->queue_length_ =
-					hdr->num_data_pkt_ - target_->num_data_pkt_ - 1;
+					hdr->num_data_pkt_ - target_->num_data_pkt_;
 			} else {
-				target_->queue_length_ = 0;	
+				target_->queue_length_ = 0;
 			}
 			if (target_->exp_pkt_id_ == 0 && target_->queue_length_ > 0) {
 				target_->exp_pkt_id_ = 2; // just receive the first data packet from target
+			} else if ((target_->queue_length_ <= 0) && (poll_state_ == SWiFi_POLL_DATA)) {
+				poll_state_ = SWiFi_POLL_NUM;
 			}
 			tcl.evalf("qlog %d %d", target_->addr_, target_->queue_length_);
 		}
@@ -712,9 +753,11 @@ void SWiFiAgent::scheduleRoundRobin(bool loop)
 	}
 	if (!target_) {
 		target_ = client_list_.at(0);
+		advance_ = false;
+		num_retry_ = 0;
 		return;
 	}
-	if (advance_) {
+	if (advance_ || (use_retry_limit_ && num_retry_>=retry_limit_)) {
 		if (!loop && target_ == client_list_.back()) {
 			target_ = NULL;
 			return;
@@ -722,12 +765,15 @@ void SWiFiAgent::scheduleRoundRobin(bool loop)
 		for (u_int32_t i = 0; i < num_client_; i++) {
 			if (target_ == client_list_.at(i)) {
 				target_ = client_list_.at((i + 1) % num_client_);
-				if (retry_) {
-					advance_ = false;
-				}
+				// Baseline will always retry before a reply is
+				// received.
+				advance_ = false;
+				num_retry_ = 0;
 				return;
 			}
 		}
+	} else {
+		num_retry_++;
 	}
 }
 
@@ -757,11 +803,15 @@ void SWiFiAgent::randomPermutation(unsigned k)
 		unsigned j = randint(rng);
 		swap(client_permutation_.at(i), client_permutation_.at(j));
 	}
-	//fprintf(stderr, "client_permutation_: [%d", client_permutation_.front());
-	//for (unsigned i = 1; i < num_client_; i++) {
-		//fprintf(stderr, ", %d", client_permutation_.at(i));
-	//}
-	//fprintf(stderr, "]\n");
+}
+
+void SWiFiAgent::printPermutation()
+{
+	fprintf(stderr, "client_permutation_: [%d", client_permutation_.front());
+	for (unsigned i = 1; i < num_client_; i++) {
+		fprintf(stderr, ", %d", client_permutation_.at(i));
+	}
+	fprintf(stderr, "]\n");
 }
 
 // Once randomPermutation is done, the first num_select_
@@ -776,8 +826,18 @@ void SWiFiAgent::scheduleSelectively()
 	} else {
 		unsigned idx = client_permutation_.at(num_scheduled_clients_);
 		target_ = client_list_.at(idx);
-		if (!retry_) {
+		//fprintf(stderr, "scheduleSelectively: idx=%d, addr=%d, num_retry_=%d\n", idx, target_->addr_, num_retry_);
+		// At this point of time, we have attempted num_retry_ times of
+		// retransmission for the current scheduled client.
+		if (use_retry_limit_ && (num_retry_ >= retry_limit_)) {
+			advance_ = true;
+			num_retry_ = 0;
 			num_scheduled_clients_++;
+			//fprintf(stderr, "scheduleSelectively: num_scheduled_clients_++=%d\n", num_scheduled_clients_);
+		} else {
+			advance_ = false;
+			num_retry_++;
+			//fprintf(stderr, "scheduleSelectively: num_retry_++=%d\n", num_retry_);
 		}
 	}
 }
