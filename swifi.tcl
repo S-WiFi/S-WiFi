@@ -333,6 +333,7 @@ if {0 == [string compare $func "delay"]} {
 	set delayf [open $delayfname w]
 }
 set n_rx 0
+set avg_throughput 0.0
 Agent/SWiFi instproc recv {from rtt data} {
 	global logf delayf n_rx func
 	set n_rx [expr $n_rx + 1]
@@ -350,14 +351,13 @@ Agent/SWiFi instproc recv {from rtt data} {
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
-	global n_rx num_slots distance datf interval func
+	global n_rx num_slots distance datf interval func avg_throughput
 	set throughput [expr double($n_rx) * $interval / $num_slots]
-	if {0 == [string compare $func "pcf"]} {
-		puts $datf "$throughput"
-	} else {
+	set avg_throughput [expr ($avg_throughput * $n_run + $throughput)/ ($n_run + 1)]
+	if {0 != [string compare $func "pcf"]} {
 		puts $datf "$distance($n_run) $throughput"
+		flush $datf
 	}
-	flush $datf
 	set n_rx 0
 }
 Agent/SWiFi instproc alog { num } {
@@ -512,10 +512,16 @@ $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 #}
 
 proc stop {} {
-	global ns_ tracefd logf
+	global ns_ tracefd logf func datf dist avg_throughput
 	$ns_ flush-trace
 	close $tracefd
 	close $logf
+	if {0 == [string compare $func "pcf"]} {
+		puts "Average throughput: $avg_throughput"
+		puts $datf "$dist $avg_throughput"
+		flush $datf
+	}
+	close $datf
 }
 
 
