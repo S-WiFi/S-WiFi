@@ -247,8 +247,8 @@ if {0 == [string compare $func "pcf"]} {
 	} else {
 		set modenum $mode
 	}
-	set selective [expr $modenum & 1]
-	set piggyback [expr $modenum & 2]
+	set selective [expr ($modenum & 1) ? 1 : 0]
+	set piggyback [expr ($modenum & 2) ? 1 : 0]
 	set use_retry_limit [expr ($modenum & 4) ? 1 : 0]
 	puts "selective=$selective, piggyback=$piggyback, use_retry_limit=$use_retry_limit"
 	Agent/SWiFi set pcf_policy_ $modenum
