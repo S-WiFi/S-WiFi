@@ -328,6 +328,7 @@ int SWiFiAgent::command(int argc, const char*const* argv)
 					initPermutation();
 					randomPermutation(num_client_);
 				}
+				advance_ = false;
 			}
 			return (TCL_OK);
 		}
