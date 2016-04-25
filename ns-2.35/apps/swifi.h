@@ -156,11 +156,12 @@ protected:
 	// Scheduling parameters
 	int do_poll_num_;      // Whether to send POLL_NUM before POLL_DATA
 	int pcf_policy_; // PCF policy: baseline/smart
-	bool selective_; // Whether to enable selective scheduling
-	// Whether to retry the same client if no response (user configurable)
-	int retry_;
-	int realtime_;  // Whether the traffic is realtime
 	bool piggyback_; // Whether the piggyback function is enabled
+	bool selective_; // Whether to enable selective scheduling
+        int use_retry_limit_; // Whether to use retry_limit_
+        int retry_limit_ ;    // Maximum number of retries during POLL_NUM
+	int num_retry_;       // Number of retries that has been attempted
+	int realtime_;  // Whether the traffic is realtime
 
 	void scheduleRoundRobin(bool loop); // Poll each registered client one by one
 	// Schedule uplink data packet transmission with Max Weight policy
@@ -169,6 +170,7 @@ protected:
 	void scheduleSelectively();
 
 	void initPermutation();
+	void printPermutation();
 	void randomPermutation(unsigned k);
 	void initRandomNumberGenerator();
 };

@@ -1596,6 +1596,7 @@ Agent/SWiFi set slot_interval_ 0.01
 Agent/SWiFi set do_poll_num_ true
 # Default PCF policy: baseline (0)
 Agent/SWiFi set pcf_policy_ 0
-Agent/SWiFi set retry_ true
+Agent/SWiFi set retry_limit_ 1
+Agent/SWiFi set use_retry_limit_ false
 Agent/SWiFi set realtime_ true
 Agent/SWiFi set num_select_ 3
