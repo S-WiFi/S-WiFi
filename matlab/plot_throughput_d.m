@@ -1,5 +1,22 @@
 function plot_throughput_d(symmetry, policy, lutf)
-% Assume the data file contains the average throughput for each distance.
+%function plot_throughput_d(symmetry, policy, lutf)
+% Plot (timely-)throughput vs d for multiple test cases.
+%
+% param symmetry: cell of strings. Valid strings are 'sym' and 'asym'.
+%                 (default: {'sym', 'asym'})
+% param policy: cell of strings. Valid strings are 'baseline', 'smart', or the
+%               string representation of numbers from 0 to 7.
+%               (default: {'baseline', 'smart'})
+% param lutf: path to the file containing the mapping from distances to channel
+%             reliabilities. (default: '../report/swifi_reliability_uplink.dat')
+% output: EPS figure files with name prefix 'throughput_d_'.
+%
+% Usage example:
+%
+% plot_throughput_d({'sym'}, {'baseline', '1', '2', '4', 'smart'})
+% will generate the plots for baseline, smart, and each intermediate policy with
+% a single feature enabled under the symmetric channel scenario.
+% (Assuming you have generated the .dat files for these policies and channels.)
 
 %% Set default arguments.
 if nargin < 1
