@@ -320,10 +320,13 @@ set logfname [format "swifi_%s_%s.log" $func $mode]
 set logf [open $logfname w]
 if {0 == [string compare $func "pcf"]} {
 	set datfname [format "swifi_%s_%s_%s.dat" $func $symmetry $mode]
+	set datlname [format "swifi_%s_%s_%s_long.dat" $func $symmetry $mode]
 } else {
 	set datfname [format "swifi_%s_%s.dat" $func $mode]
+	set datlname [format "swifi_%s_%s_long.dat" $func $mode]
 }
 set datf [open $datfname w]
+set datl [open $datlname w]
 set logqname [format "swifi_%s_%s_queue.log" $func $mode]
 set logq [open $logqname w]
 set loganame [format "swifi_%s_%s_arrival.log" $func $mode]
@@ -332,11 +335,12 @@ if {0 == [string compare $func "delay"]} {
 	set delayfname [format "swifi_%s_%s_%d.dat" $func $mode $retry_mac]
 	set delayf [open $delayfname w]
 }
-set n_rx 0
+set n_rx_tot 0
 set avg_throughput 0.0
 Agent/SWiFi instproc recv {from rtt data} {
-	global logf delayf n_rx func
-	set n_rx [expr $n_rx + 1]
+	global logf delayf n_rx_tot func n_rx
+	set n_rx_tot [expr $n_rx_tot + 1]
+	set n_rx($from) [expr $n_rx($from) + 1]
         $self instvar node_
 	if {0 != [string compare $func "delay"]} {
 		set rtt_name "round-trip-time"
@@ -351,14 +355,21 @@ Agent/SWiFi instproc recv {from rtt data} {
 	flush $logf
 }
 Agent/SWiFi instproc stat {n_run} {
-	global n_rx num_slots distance datf interval func avg_throughput
-	set throughput [expr double($n_rx) * $interval / $num_slots]
+	global n_rx_tot num_slots distance datf interval func avg_throughput n_rx datl num_clients avg_throughput_i throughput_i
+	set throughput [expr double($n_rx_tot) * $interval / $num_slots]
 	set avg_throughput [expr ($avg_throughput * $n_run + $throughput)/ ($n_run + 1)]
 	if {0 != [string compare $func "pcf"]} {
 		puts $datf "$distance($n_run) $throughput"
 		flush $datf
 	}
-	set n_rx 0
+	for {set i 1} {$i <= $num_clients} {incr i} {
+		set throughput_i($i) [expr double($n_rx($i)) * $interval / $num_slots] 
+		set avg_throughput_i($i) [expr ($avg_throughput_i($i) * $n_run + $throughput_i($i))/ ($n_run + 1)]
+	}
+	set n_rx_tot 0
+	for {set k 1} {$k <= $num_clients} {incr k} {
+		set n_rx($k) 0
+	}
 }
 Agent/SWiFi instproc alog { num } {
 	global loga
@@ -416,6 +427,9 @@ for {set i 1} {$i < $val(nn) } {incr i} {
 	$node_($i) set Z_ 0
 	set sw_($i) [new Agent/SWiFi]
 	$ns_ attach-agent $node_($i) $sw_($i)
+	set n_rx($i) 0
+	set avg_throughput_i($i) 0
+	set throughput_i($i) 0
 }
 
 # ======================================================================
@@ -512,7 +526,7 @@ $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 #}
 
 proc stop {} {
-	global ns_ tracefd logf func datf dist avg_throughput
+	global ns_ tracefd logf func datf dist avg_throughput datl avg_throughput_i num_clients
 	$ns_ flush-trace
 	close $tracefd
 	close $logf
@@ -520,8 +534,13 @@ proc stop {} {
 		puts "Average throughput: $avg_throughput"
 		puts $datf "$dist $avg_throughput"
 		flush $datf
+		for {set i 1} {$i <= $num_clients} {incr i} {
+			puts $datl "$i $avg_throughput_i($i)"
+			flush $datl
+		}
 	}
 	close $datf
+	close $datl
 }
 
 
