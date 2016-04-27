@@ -656,7 +656,7 @@ void SWiFiAgent::recv(Packet* pkt, Handler*)
 				advance_ = true;
 				num_scheduled_clients_++;
 				//fprintf(stderr, "SWiFi_PKT_NUM_UL: num_scheduled_clients_++=%d\n", num_scheduled_clients_);
-			} else {
+			} else if (use_retry_limit_ && (num_retry_ > retry_limit_)) {
 				fprintf(stderr, "You have found a bug about num_retry_!\n");
 				exit(1);
 			}
