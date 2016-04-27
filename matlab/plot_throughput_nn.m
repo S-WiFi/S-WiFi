@@ -69,7 +69,7 @@ for k1 = 1:length(symmetry)
             fprintf(2, 'File %s does not exist!\n', f);
             R = [ones(11, 1), zeros(11, 1)];
         end
-        nn = R(:,3);
+        nn = R(:,3) - 1;
         throughput = R(:,2);
         plot(nn, throughput, style{k2}, 'LineWidth', 2, 'MarkerSize', 10);
         hold on;
