@@ -119,10 +119,15 @@ if {0 == [string compare $func "pcf"]} {
 puts "func: $func, mode: $mode"
 
 if {0 == [string compare $func "pcf"]} {
-	set val(nn)             6          ;# number of mobilenodes
+	if {$argc < 5} {
+		set val(nn)     6          ;# number of mobilenodes
+	} else {
+		set val(nn)     [lindex $argv 4]		
+	}
 } else {
 	set val(nn)             2          ;# number of mobilenodes
 }
+
 set interval 10
 puts "interval: $interval, number of nodes: $val(nn)"
 
@@ -526,16 +531,16 @@ $ns_ at 10000.01 "puts \"NS EXITING...\" ; $ns_ halt"
 #}
 
 proc stop {} {
-	global ns_ tracefd logf func datf dist avg_throughput datl avg_throughput_i num_clients
+	global ns_ tracefd logf func datf dist avg_throughput datl avg_throughput_i num_clients val
 	$ns_ flush-trace
 	close $tracefd
 	close $logf
 	if {0 == [string compare $func "pcf"]} {
 		puts "Average throughput: $avg_throughput"
-		puts $datf "$dist $avg_throughput"
+		puts $datf "$dist $avg_throughput $val(nn)"
 		flush $datf
 		for {set i 1} {$i <= $num_clients} {incr i} {
-			puts $datl "$dist $i $avg_throughput_i($i)"
+			puts $datl "$dist $i $avg_throughput_i($i) $val(nn)"
 			flush $datl
 		}
 	}
