@@ -217,12 +217,8 @@ basicstyle=\ttfamily,
     \item $\SI{1}{slot} = \SI{10}{ms}, T=10$
     \item Number of clients $N=5$
     \item Number of packets $U_\text{min}=0, U_\text{max}=2$
-    \item Channel
-      \begin{itemize}
-	\item Symmetric: $p_i=p, i=1,2,\dotsc,N$
-	\item Asymmetric: $p_1=p_2=1;\quad p_i=p, i=3,4,\dotsc,N$
-	\item $p\approx0.57$ (distance \SI{1000}{m})
-      \end{itemize}
+    \item Channel reliability $p\approx0.57$ (distance \SI{1000}{m})
+    \item Retry limit: 1 FIXME
     \item Metric: total timely-throughput of all clients
       \begin{itemize}
 	\item Averaged over 10 runs
@@ -246,26 +242,48 @@ basicstyle=\ttfamily,
 
 \begin{frame}
 \frametitle{Performance under Symmetric Channel}
-\begin{itemize}
-\item $p$ ranges from $0$ to $1$
-\end{itemize}
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[height=.5\textheight]{R_p_sym.pdf}
-  \caption{Throughout v.s. channel reliability.}
-\end{figure}
+\begin{columns}
+  \begin{column}{.5\textwidth}
+    \begin{itemize}
+      \item Symmetry: $p_i=p, i=1,2,\dotsc,N$
+      \item $p$ ranges from $0$ to $1$
+      \item Smart is always better
+      \item Huge improvement when the channel reliability is moderate
+      \item Smart achieves the network capacity when $p=1$
+    \end{itemize}
+  \end{column}
+  \begin{column}{.5\textwidth}
+    \begin{figure}[htbp]
+      \centering
+      \includegraphics[height=.5\textheight]{R_p_sym.pdf}
+      \caption{Throughout v.s. channel reliability.}
+    \end{figure}
+  \end{column}
+\end{columns}
 \end{frame}
 
 \begin{frame}
 \frametitle{Performance under Asymmetric Channel}
+\begin{columns}
+  \begin{column}{.5\textwidth}
 \begin{itemize}
-\item $p$ ranges from $0$ to $1$
+  \item Asymmetry
+    \begin{itemize}
+      \item $p_1=p_2=1$
+      \item $p_i=p, i=3,4,\dotsc,N$
+    \end{itemize}
+  \item $p$ ranges from $0$ to $1$
+  \item Smart is consistently better, especially when channel is poor
 \end{itemize}
+  \end{column}
+  \begin{column}{.5\textwidth}
 \begin{figure}[htbp]
   \centering
   \includegraphics[height=.5\textheight]{R_p_asym.pdf}
   \caption{Throughout v.s. channel reliability of distant clients.}
 \end{figure}
+  \end{column}
+\end{columns}
 \end{frame}
 
 \begin{frame}
