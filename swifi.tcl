@@ -535,7 +535,7 @@ proc stop {} {
 		puts $datf "$dist $avg_throughput"
 		flush $datf
 		for {set i 1} {$i <= $num_clients} {incr i} {
-			puts $datl "$i $avg_throughput_i($i)"
+			puts $datl "$dist $i $avg_throughput_i($i)"
 			flush $datl
 		}
 	}
