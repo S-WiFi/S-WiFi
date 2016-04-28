@@ -263,30 +263,6 @@ basicstyle=\ttfamily,
 \end{frame}
 
 \begin{frame}
-\frametitle{Performance under Asymmetric Channel}
-\begin{columns}
-  \begin{column}{.5\textwidth}
-\begin{itemize}
-  \item Asymmetry
-    \begin{itemize}
-      \item $p_1=p_2=1$
-      \item $p_j=p, j=3,4,\dotsc,N$
-    \end{itemize}
-  \item $p$ ranges from $0$ to $1$
-  \item Smart is consistently better, especially when channel is poor
-\end{itemize}
-  \end{column}
-  \begin{column}{.5\textwidth}
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[height=.5\textheight]{R_p_asym.pdf}
-  \caption{Throughout v.s. channel reliability of distant clients.}
-\end{figure}
-  \end{column}
-\end{columns}
-\end{frame}
-
-\begin{frame}
 \frametitle{Impact of Number of Clients}
 \begin{columns}
   \begin{column}{.5\textwidth}
@@ -306,6 +282,30 @@ basicstyle=\ttfamily,
   \centering
   \includegraphics[height=.5\textheight]{R_N_sym.pdf}
   \caption{Throughout v.s. number of clients.}
+\end{figure}
+  \end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}
+\frametitle{Performance under Asymmetric Channel}
+\begin{columns}
+  \begin{column}{.5\textwidth}
+\begin{itemize}
+  \item Asymmetry
+    \begin{itemize}
+      \item $p_1=p_2=1$
+      \item $p_j=p, j=3,4,\dotsc,N$
+    \end{itemize}
+  \item $p$ ranges from $0$ to $1$
+  \item Smart is consistently better, especially when channel is poor
+\end{itemize}
+  \end{column}
+  \begin{column}{.5\textwidth}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[height=.5\textheight]{R_p_asym.pdf}
+  \caption{Throughout v.s. channel reliability of distant clients.}
 \end{figure}
   \end{column}
 \end{columns}
