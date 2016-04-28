@@ -287,45 +287,42 @@ basicstyle=\ttfamily,
 \end{frame}
 
 \begin{frame}
-\frametitle{Impact of Number of Packets}
-\begin{itemize}
-  \item $U_\text{max}$ ranges from $2$ to $10$ FIXME
-  \item $U_\text{min}=0$ FIXME
-  \item Symmetric channel FIXME
-\end{itemize}
-\begin{figure}[htbp]
-  \centering
-  %\includegraphics[height=.5\textheight]{R_U.pdf}
-  \missingfigure{Testing a long text string}
-  \caption{Throughout v.s. number of packets.}
-\end{figure}
-\end{frame}
-
-\begin{frame}
 \frametitle{Impact of Number of Clients}
+\begin{columns}
+  \begin{column}{.5\textwidth}
 \begin{itemize}
-\item $N$ ranges from $1$ to $10$ FIXME
-\item Symmetric channel FIXME
+\item $N$ ranges from $2$ to $10$
+\item Symmetric channel
 \end{itemize}
+  \end{column}
+  \begin{column}{.5\textwidth}
 \begin{figure}[htbp]
   \centering
-  %\includegraphics[height=.5\textheight]{R_N.pdf}
-  \missingfigure{Testing a long text string}
+  \includegraphics[height=.5\textheight]{R_N_sym.pdf}
   \caption{Throughout v.s. number of clients.}
 \end{figure}
+  \end{column}
+\end{columns}
 \end{frame}
 
 \begin{frame}{Network Utility}
+\begin{columns}
+  \begin{column}{.5\textwidth}
   \begin{itemize}
     \item $q_n$: timely-throughput for client $n$
-    \item $U_n(q_n) = \log (100 q_n)$
+    \item $U_n(q_n) = \log (\frac{q_n}{10^{-4}})$
+    \item Network utility $\sum_{n=1}^{N} U_n(q_n)$
+    \item Asymmetric channel
   \end{itemize}
+  \end{column}
+  \begin{column}{.5\textwidth}
 \begin{figure}[htbp]
   \centering
-  %\includegraphics[height=.5\textheight]{R_N.pdf}
-  \missingfigure{Testing a long text string}
-  \caption{Network utility v.s. channel reliability.}
+  \includegraphics[height=.5\textheight]{U_p_asym.pdf}
+  \caption{Utility v.s. channel reliability.}
 \end{figure}
+  \end{column}
+\end{columns}
 \end{frame}
 
 \begin{frame}{Fairness}
