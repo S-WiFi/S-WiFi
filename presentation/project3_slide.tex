@@ -270,7 +270,7 @@ basicstyle=\ttfamily,
   \item Asymmetry
     \begin{itemize}
       \item $p_1=p_2=1$
-      \item $p_i=p, i=3,4,\dotsc,N$
+      \item $p_j=p, j=3,4,\dotsc,N$
     \end{itemize}
   \item $p$ ranges from $0$ to $1$
   \item Smart is consistently better, especially when channel is poor
@@ -293,6 +293,12 @@ basicstyle=\ttfamily,
 \begin{itemize}
 \item $N$ ranges from $2$ to $10$
 \item Symmetric channel
+\item Smart is better in general.
+  \begin{itemize}
+    \item The case with $N=2$ is due to retry limit $=1$.
+  \end{itemize}
+\item As $N$ goes very large, Baseline gives $0$ throughput while Smart
+  performs steadily.
 \end{itemize}
   \end{column}
   \begin{column}{.5\textwidth}
@@ -300,6 +306,26 @@ basicstyle=\ttfamily,
   \centering
   \includegraphics[height=.5\textheight]{R_N_sym.pdf}
   \caption{Throughout v.s. number of clients.}
+\end{figure}
+  \end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Network Utility}
+\begin{columns}
+  \begin{column}{.5\textwidth}
+  \begin{itemize}
+    \item $q_n$: timely-throughput for $n$
+    %\item $U_n(q_n) = \log (\frac{q_n}{10^{-4}})$
+    \item Network utility $\sum U_n(q_n) = \sum \log (\frac{q_n}{10^{-4}})$
+    \item Symmetric channel
+  \end{itemize}
+  \end{column}
+  \begin{column}{.5\textwidth}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[height=.5\textheight]{U_p_sym.pdf}
+  \caption{Utility v.s. channel reliability.}
 \end{figure}
   \end{column}
 \end{columns}
@@ -325,15 +351,6 @@ basicstyle=\ttfamily,
 \end{columns}
 \end{frame}
 
-\begin{frame}{Fairness}
-\begin{figure}[htbp]
-  \centering
-  %\includegraphics[height=.5\textheight]{R_N.pdf}
-  \missingfigure{Testing a long text string}
-  \caption{Utility of each clients.}
-\end{figure}
-\end{frame}
-
 \section*{Conclusion}
 \begin{frame}{Conclusion}
   \begin{itemize}
@@ -341,7 +358,7 @@ basicstyle=\ttfamily,
     \item Our smart policy incoporates selective polling, piggybacking, and
       retry limit to improve the performance.
     \item Simulation shows our smart policy outperforms the baseline policy in
-      terms of timely-throughput, network utility, and fairness.
+      terms of timely-throughput and network utility.
   \end{itemize}
 \end{frame}
 
