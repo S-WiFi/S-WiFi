@@ -61,9 +61,9 @@ We consider a wireless network of one AP and $N$ clients, where $N\ge1$. We cons
 The main challenge of using PCF for WiFi uplink transmissions is that since the packets are generated and queued on the client's side, and the AP does not know the number of packets of each client at first. Therefore, the AP needs to collect the queue information of the clients to make scheduling decisions.
 
 \subsection{Baseline Policy}
-Under the baseline policy, the AP first collects the queue information by polling each client one by one for the number of data packets it generates ($X_n$). After all clients are polled, the AP knows the number of packets at each client. Next, the AP uses the Max-Weight policy to schedule one of the clients in each time slot for actual data transmission. 
+Under the baseline policy, the AP first collects the queue information by polling each client one by one for the number of data packets it generates ($X_n$). After all clients are polled, the AP knows the number of packets at each client. Next, the AP uses the Max-Weight policy to schedule one of the clients in each time slot for actual data transmission, where the weight is the product of the remaining queue length and the channel reliability for each client.
 
-The major issue in the baseline policy is that there is no data transmission in the polling phase. As a result, channel utilization for data packets can be very low. Moreover, the channel utilization is especially low with large network size or poor wireless channels since the AP ends up spending most of the time on polling queue information.
+The major issue of the baseline policy is that there is no data transmission in the first phase of polling queue information $X_n$. As a result, channel utilization for data packets can be very low. In fact, we have shown in the previous project that the channel utilization is especially low with large network size (large $N$) or poor wireless channels (small $p$) since the AP ends up spending most of the time on polling queue information $X_n$.
 
 \section{Smart Policy}
 
